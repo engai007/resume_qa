@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     default_max_tokens: int = 1024
     default_timeout: int = 120
 
-    # Every LLM call (agent, model, prompt version, tokens, seconds, errors) is appended here
+    # Every LLM call (agent, model, tokens, seconds) is appended here
     llm_log_file: str = "logs/llm_calls.jsonl"
 
     # Resume parser
