@@ -1,0 +1,1 @@
+This Repo ise to qa the resume by parsing and embedding it for multi purpose
