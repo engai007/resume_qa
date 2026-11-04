@@ -9,6 +9,14 @@ class Settings(BaseSettings):
     app_name: str = "AI Agent System"
     debug: bool = False
 
+    # Database
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/resumer_qa"
+
+    # Auth (JWT)
+    jwt_secret: str = ""
+    jwt_algorithm: str = "HS256"
+    access_token_minutes: int = 60
+
     # Hugging Face
     hf_token: str = ""
 
@@ -19,7 +27,7 @@ class Settings(BaseSettings):
     default_max_tokens: int = 1024
     default_timeout: int = 120
 
-    # Every LLM call (agent, model, prompt version, tokens, seconds, errors) is appended here
+    # Every LLM call (agent, model, tokens, seconds) is appended here
     llm_log_file: str = "logs/llm_calls.jsonl"
 
     # Resume parser
