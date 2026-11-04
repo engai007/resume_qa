@@ -219,3 +219,13 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 CLAUDE.md
+# Parser outputs (may contain personal data)
+outputs/
+# Input resumes (personal data)
+resumes/*
+!resumes/.gitkeep
+
+# LLM call logs
+logs/
+scripts/
+resumes/

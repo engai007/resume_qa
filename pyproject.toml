@@ -6,6 +6,13 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "pydantic-settings>=2.4",
+    "pymupdf>=2.1",
+    "sentence-transformers>=6.2.0",
+    "pandas>=3.1.0",
+    "numpy>=2.4.6",
+    "langchain-core>=1.7.4",
+    "langchain-huggingface>=1.2.3",
+    "huggingface-hub>=1.33.0",
 ]
 
 [dependency-groups]
