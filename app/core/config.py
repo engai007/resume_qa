@@ -9,6 +9,14 @@ class Settings(BaseSettings):
     app_name: str = "AI Agent System"
     debug: bool = False
 
+    # Database
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/resumer_qa"
+
+    # Auth (JWT)
+    jwt_secret: str = ""
+    jwt_algorithm: str = "HS256"
+    access_token_minutes: int = 60
+
     # Hugging Face
     hf_token: str = ""
 
