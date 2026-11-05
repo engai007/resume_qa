@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/resumer_qa"
 
+    # vector database
+    qdrant_url: str = "http://localhost:6333"
+    qdrant_api_key: str = ""  # empty for local Qdrant without auth
+
     # Auth (JWT)
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
