@@ -23,6 +23,6 @@ async def upload(
     db: AsyncSession = Depends(get_db),
     agent: ResumeParserAgent = Depends(get_parser_agent),
 ):
-    """Upload one or more resume PDFs. Already uploaded files are skipped."""
+    """Upload one or more resume PDFs. Already uploaded files are skipped. New ones are indexed in Qdrant."""
     contents = [(f.filename, await f.read()) for f in files]
-    return await upload_documents(db, user.id, contents, agent)
+    return await upload_documents(db, user, contents, agent)

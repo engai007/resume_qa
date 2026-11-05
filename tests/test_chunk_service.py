@@ -16,5 +16,5 @@ def test_build_chunks_adds_metadata():
     assert [c.text for c in chunks] == ["Profile\nName: Jane Doe", "Skills\nLanguages: Python"]
     assert chunks[1].metadata.model_dump() == {
         "document_id": 3, "document_hash": "abc123", "uploaded_by": 7,
-        "user_email": "rec@x.com", "uploaded_at": uploaded, "chunk_index": 1,
+        "user_email": "rec@x.com", "uploaded_at": uploaded, "candidate_name": "Jane Doe", "chunk_index": 1,
     }

@@ -4,7 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.resume_parser import ResumeParserAgent
-from app.models import Document, DocumentMetaData
+from app.models import Document, DocumentMetaData, User
+from app.services.indexing_service import index_document
 from app.services.resumer_parser import parse_resumes
 
 
@@ -12,9 +13,11 @@ def file_hash(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
-async def upload_documents(db: AsyncSession, user_id: int, files: list[tuple[str, bytes]],
+async def upload_documents(db: AsyncSession, user: User, files: list[tuple[str, bytes]],
                            agent: ResumeParserAgent) -> list[dict]:
-    """Save new resumes for a user. Files the user already uploaded are not parsed again."""
+    """Save new resumes for a user, then index them in Qdrant.
+    Files the user already uploaded are not parsed again."""
+    user_id = user.id
     hashes = [file_hash(content) for _, content in files]
 
     # documents this user already has
@@ -40,12 +43,20 @@ async def upload_documents(db: AsyncSession, user_id: int, files: list[tuple[str
         created[h] = doc
     await db.commit()
 
+    # a failed index does not fail the upload: the document is saved, indexed_version stays NULL
+    for doc in created.values():
+        await index_document(db, doc, user)
+
     results = []
     for (name, content), h in zip(files, hashes):
         if h in existing:
-            results.append({"filename": name, "status": "already_exists", "document_id": existing[h].id})
+            doc = existing[h]
+            results.append({"filename": name, "status": "already_exists", "document_id": doc.id,
+                            "indexed": doc.indexed_version is not None})
         elif h in created:
-            results.append({"filename": name, "status": "created", "document_id": created[h].id})
+            doc = created[h]
+            results.append({"filename": name, "status": "created", "document_id": doc.id,
+                            "indexed": doc.indexed_version is not None})
         elif not content.startswith(b"%PDF"):
             results.append({"filename": name, "status": "failed", "error": "not a PDF file"})
         else:

@@ -37,7 +37,7 @@ def test_upload_multiple_and_skip_existing(client, llm_log):
 
     # upload again -> nothing parsed
     r = upload(client, headers, ("jane.pdf", jane)).json()
-    assert r == [{"filename": "jane.pdf", "status": "already_exists", "document_id": 1, "error": None}]
+    assert r == [{"filename": "jane.pdf", "status": "already_exists", "document_id": 1, "indexed": True, "error": None}]
     assert llm_calls(llm_log) == 2
 
 
@@ -52,7 +52,7 @@ def test_same_file_for_another_user_is_new(client):
 def test_non_pdf_fails_others_still_saved(client):
     app.dependency_overrides[get_parser_agent] = fake_agent
     r = upload(client, auth_header(client), ("notes.txt", b"hello"), ("jane.pdf", make_pdf(RESUME_LINES))).json()
-    assert r[0] == {"filename": "notes.txt", "status": "failed", "document_id": None, "error": "not a PDF file"}
+    assert r[0] == {"filename": "notes.txt", "status": "failed", "document_id": None, "indexed": False, "error": "not a PDF file"}
     assert r[1]["status"] == "created"
 
 

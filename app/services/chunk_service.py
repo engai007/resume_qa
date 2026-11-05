@@ -10,6 +10,7 @@ def build_metadata(doc: Document, user: User, chunk_index: int) -> ChunkMetadata
         uploaded_by=user.id,
         user_email=user.email,
         uploaded_at=doc.created_at,
+        candidate_name=doc.meta_data.parsed_doc_json.get("name"),
         chunk_index=chunk_index,
     )
 
