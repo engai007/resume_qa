@@ -2,6 +2,7 @@ import asyncio
 
 import pytest
 from fastapi.testclient import TestClient
+from qdrant_client import AsyncQdrantClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -9,6 +10,8 @@ from app.core.config import settings
 from app.db.database import Base, get_db
 from app.main import app
 from app.models import UserType
+from app.services import indexing_service
+from app.services import vector_migration_service
 
 
 @pytest.fixture(autouse=True)
@@ -17,6 +20,28 @@ def llm_log(tmp_path, monkeypatch):
     path = tmp_path / "llm_calls.jsonl"
     monkeypatch.setattr(settings, "llm_log_file", str(path))
     return path
+
+
+async def fake_embed(texts):
+    return [[1.0] + [0.0] * (settings.embedding_size - 1) for _ in texts]
+
+
+async def run_vector_migrations(client: AsyncQdrantClient, db_path) -> None:
+    """Apply every vector migration to `client` (using an empty throwaway DB)."""
+    engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}", poolclass=NullPool)
+    await create_test_db(engine)
+    async with async_sessionmaker(engine)() as db:
+        await vector_migration_service.upgrade(db, client)
+
+
+@pytest.fixture
+def vector_db(tmp_path, monkeypatch):
+    """Indexing goes to an in-memory Qdrant with fake embeddings (no real Qdrant, no HF calls)."""
+    client = AsyncQdrantClient(":memory:")
+    monkeypatch.setattr(indexing_service, "qdrant", client)
+    monkeypatch.setattr(indexing_service, "embed_texts", fake_embed)
+    asyncio.run(run_vector_migrations(client, tmp_path / "migrations.db"))
+    return client
 
 
 async def create_test_db(engine):
@@ -28,7 +53,7 @@ async def create_test_db(engine):
 
 
 @pytest.fixture
-def client(tmp_path, monkeypatch):
+def client(tmp_path, monkeypatch, vector_db):
     """App wired to a throwaway SQLite DB instead of Postgres."""
     monkeypatch.setattr(settings, "jwt_secret", "test-secret-that-is-long-enough-for-hs256")
     engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path}/test.db", poolclass=NullPool)

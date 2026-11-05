@@ -7,9 +7,18 @@ def make_chunks(r: dict) -> list[str]:
     chunks = []
 
     # profile
-    profile = f"{r.get('name')} | {r.get('title') or ''} | {r.get('location') or ''}"
+    fields = [
+        ("Name", r.get("name")),
+        ("Title", r.get("title")),
+        ("Location", r.get("location")),
+        ("Email", r.get("email")),
+        ("Phone", r.get("phone")),
+        ("LinkedIn", r.get("linkedin")),
+        ("GitHub", r.get("github")),
+    ]
+    profile = "Profile\n" + "\n".join(f"{k}: {v}" for k, v in fields if v)
     if r.get("summary"):
-        profile += f"\n{r['summary']}"
+        profile += f"\nSummary: {r['summary']}"
     chunks.append(profile)
 
     # skills

@@ -12,6 +12,17 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/resumer_qa"
 
+    # vector database
+    qdrant_url: str = "http://localhost:6333"
+    qdrant_api_key: str = ""  # empty for local Qdrant without auth
+    qdrant_collection: str = "resume_chunks"  # alias; real collections are resume_chunks_v1, _v2...
+
+    # embeddings via HF Inference (changing the model needs a vector migration, see vector_migrations/)
+    embedding_model: str = "BAAI/bge-base-en-v1.5"
+    embedding_provider: str = "hf-inference"
+    embedding_size: int = 768
+    embedding_timeout: int = 60
+
     # Auth (JWT)
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"

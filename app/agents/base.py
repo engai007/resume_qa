@@ -16,7 +16,7 @@ class BaseAgent:
     """Every agent sets `name` and `prompt`, and can override the model settings."""
 
     name: str
-    prompt: str  # file in app/prompts, e.g. "qa_agent/system"
+    prompt: str  # file in app/prompts, e.g. "resume_parser/system"
     model_id: str = settings.default_model_id
     provider: str = settings.default_provider
     temperature: float = settings.default_temperature
