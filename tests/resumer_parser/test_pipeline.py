@@ -41,7 +41,8 @@ def make_agent() -> ResumeParserAgent:
 
 
 def test_parse_resume():
-    r = asyncio.run(parse_resume(make_pdf(RESUME_LINES), make_agent()))
+    lines, r = asyncio.run(parse_resume(make_pdf(RESUME_LINES), make_agent()))
+    assert lines[0] == "Jane Doe"
     assert r["name"] == "Jane Doe"
     assert r["email"] == "jane@x.com" and r["phone"] == "+91 98765 43210"
     assert r["experience"][0]["details"] == ["Built data pipelines in Python", "Led a team of five engineers"]
@@ -51,5 +52,5 @@ def test_parse_resume():
 def test_parse_resumes_keeps_going_when_one_fails():
     files = {"jane.pdf": make_pdf(RESUME_LINES), "broken.pdf": b"not a pdf"}
     results = asyncio.run(parse_resumes(files, make_agent()))
-    assert results["jane.pdf"]["name"] == "Jane Doe"
+    assert results["jane.pdf"][1]["name"] == "Jane Doe"
     assert isinstance(results["broken.pdf"], Exception)

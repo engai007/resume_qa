@@ -50,3 +50,37 @@ def build_resume(parsed: dict, contact: dict, texts: list[str]) -> dict:
         "awards": lines_in(parsed.get("awards"), texts),
         "other_sections": with_details(parsed.get("other_sections"), texts),
     }
+
+
+PERSONAL_WORDS = ("personal project", "side project", "academic project",
+                  "college project", "hobby project", "self project")
+
+
+def is_personal(e: dict) -> bool:
+    """No company, or the entry says it's a personal/side project."""
+    if not e.get("company"):
+        return True
+    text = " ".join([e.get("company") or "", e.get("role") or ""] + (e.get("details") or [])).lower()
+    return any(w in text for w in PERSONAL_WORDS)
+
+
+def move_personal_projects(r: dict) -> dict:
+    """Move personal/side projects the LLM put under experience into projects."""
+    keep = []
+    for e in r.get("experience") or []:
+        if not is_personal(e):
+            keep.append(e)
+            continue
+        # the entry becomes one project; its sub-projects are folded into its details
+        details = [d for d in e.get("details") or [] if d.strip().lower() not in PERSONAL_WORDS]
+        for p in e.get("projects") or []:
+            details.append(p.get("name"))
+            details.extend(p.get("details") or [])
+        r.setdefault("projects", []).append({
+            "name": e.get("company"),
+            "start": e.get("start"),
+            "end": e.get("end"),
+            "details": details,
+        })
+    r["experience"] = keep
+    return r
