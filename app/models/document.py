@@ -1,4 +1,6 @@
-from sqlalchemy import JSON, ForeignKey, String, UniqueConstraint, true
+from datetime import datetime
+
+from sqlalchemy import JSON, DateTime, ForeignKey, String, UniqueConstraint, func, true
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -15,6 +17,7 @@ class Document(Base):
     document_hash: Mapped[str] = mapped_column(String(64), index=True)  # SHA-256 of the file
     generated_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
     is_active: Mapped[bool] = mapped_column(default=True, server_default=true())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())  # upload time
 
     meta_data: Mapped["DocumentMetaData"] = relationship(back_populates="document")
 
