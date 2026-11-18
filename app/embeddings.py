@@ -12,3 +12,12 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
                                   timeout=settings.embedding_timeout)
     vectors = await client.feature_extraction(texts, model=settings.embedding_model, truncate=True)
     return vectors.tolist()
+
+
+# bge models want this in front of search questions (not in front of the stored chunks)
+QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
+
+
+async def embed_query(query: str) -> list[float]:
+    [vector] = await embed_texts([QUERY_PREFIX + query])
+    return vector

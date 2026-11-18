@@ -10,7 +10,7 @@ from app.core.config import settings
 from app.db.database import Base, get_db
 from app.main import app
 from app.models import UserType
-from app.services import indexing_service
+from app.services import indexing_service, retriever_service
 from app.services import vector_migration_service
 
 
@@ -26,6 +26,11 @@ async def fake_embed(texts):
     return [[1.0] + [0.0] * (settings.embedding_size - 1) for _ in texts]
 
 
+async def fake_embed_query(query):
+    [vector] = await fake_embed([query])
+    return vector
+
+
 async def run_vector_migrations(client: AsyncQdrantClient, db_path) -> None:
     """Apply every vector migration to `client` (using an empty throwaway DB)."""
     engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}", poolclass=NullPool)
@@ -36,10 +41,12 @@ async def run_vector_migrations(client: AsyncQdrantClient, db_path) -> None:
 
 @pytest.fixture
 def vector_db(tmp_path, monkeypatch):
-    """Indexing goes to an in-memory Qdrant with fake embeddings (no real Qdrant, no HF calls)."""
+    """Indexing and search use an in-memory Qdrant with fake embeddings (no real Qdrant, no HF calls)."""
     client = AsyncQdrantClient(":memory:")
     monkeypatch.setattr(indexing_service, "qdrant", client)
     monkeypatch.setattr(indexing_service, "embed_texts", fake_embed)
+    monkeypatch.setattr(retriever_service, "qdrant", client)
+    monkeypatch.setattr(retriever_service, "embed_query", fake_embed_query)
     asyncio.run(run_vector_migrations(client, tmp_path / "migrations.db"))
     return client
 

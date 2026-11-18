@@ -38,6 +38,7 @@ documents + document_meta_data   ──index──►     resume_chunks  (vector
 |---|---|
 | `0001_create_resume_chunks_v1` | Created `resume_chunks_v1` (384 numbers, all-MiniLM-L6-v2), indexes, alias |
 | `0002_rebuild_with_bge_base` | Created `resume_chunks_v2` (768 numbers, `BAAI/bge-base-en-v1.5`), re-embedded every document, moved the alias to v2 |
+| `0003_index_document_hash` | Added a payload index on `document_hash` in v2 (search can be limited to given resumes) |
 
 ```
 resume_chunks  ──►  resume_chunks_v2   (768, bge-base-en-v1.5)   ← in use
@@ -67,7 +68,8 @@ uv run python scripts/vector_migrate.py status
 ```
 applied  0001_create_resume_chunks_v1
 applied  0002_rebuild_with_bge_base
-PENDING  0003_add_index_on_candidate_name      ← will run on next `upgrade`
+applied  0003_index_document_hash
+PENDING  0004_add_index_on_candidate_name      ← will run on next `upgrade`
 ```
 
 Running `upgrade` twice is safe. The second time it prints `Nothing to apply, already up to date.`
@@ -127,6 +129,8 @@ async def upgrade(client, db) -> None:   # client = Qdrant, db = Postgres sessio
 
 Rules:
 
+0. **A rebuild must create every payload index the current collection has** (today: `uploaded_by`,
+   `document_id`, `document_hash`). Indexes belong to a collection, so they don't move with the alias.
 1. **Write values out in the file** (`size=768`, `"resume_chunks_v2"`). Don't read them from `settings`.
    The file must do the same thing forever, even after `.env` changes.
 2. **Never edit a migration that has already run** anywhere. Add a new file instead.
@@ -145,7 +149,7 @@ Each file is recorded right after it succeeds. If `0003` fails, `0001` and `0002
 
 We want fast filtering by candidate name. The vectors don't change, so we update in place.
 
-`vector_migrations/0003_add_index_on_candidate_name.py`
+`vector_migrations/0004_add_index_on_candidate_name.py`
 ```python
 """Fast filter on candidate_name."""
 from qdrant_client import AsyncQdrantClient, models
@@ -167,7 +171,7 @@ We want `user_type` (recruiter / candidate) on every chunk.
 2. Bump `INDEX_VERSION = 3` in `indexing_service.py`.
 3. Existing chunks don't have the field yet. Re-index them **into the same collection**, since the vectors are the same size and model:
 
-`vector_migrations/0004_add_user_type_to_chunks.py`
+`vector_migrations/0005_add_user_type_to_chunks.py`
 ```python
 """Re-index every document so its chunks get the new user_type field."""
 from sqlalchemy import select
@@ -198,7 +202,7 @@ Say we move from `bge-base-en-v1.5` (768) to a model with 1024 numbers.
 
 1. `.env` and `.env.example`: `EMBEDDING_MODEL=<new model>`, `EMBEDDING_SIZE=1024`
 2. `indexing_service.py`: `INDEX_VERSION = 3` (and add it to the comment listing the versions)
-3. New file `vector_migrations/0005_rebuild_with_new_model.py`, the same shape as `0002`:
+3. New file `vector_migrations/0006_rebuild_with_new_model.py`, the same shape as `0002`:
 
 ```python
 """Rebuild with <new model> (1024 numbers)."""
@@ -219,6 +223,7 @@ async def upgrade(client: AsyncQdrantClient, db) -> None:
         await client.create_collection(NEW, vectors_config=models.VectorParams(size=1024, distance=models.Distance.COSINE))
     await client.create_payload_index(NEW, "uploaded_by", models.PayloadSchemaType.INTEGER)
     await client.create_payload_index(NEW, "document_id", models.PayloadSchemaType.INTEGER)
+    await client.create_payload_index(NEW, "document_hash", models.PayloadSchemaType.KEYWORD)
 
     # 2. fill it from Postgres; search keeps using v2 meanwhile
     rows = (await db.execute(
@@ -245,7 +250,7 @@ alias moved    resume_chunks ──► v3        search now uses the new model
                v2 kept                     rollback is possible
 ```
 
-If Hugging Face is down halfway: the migration raises an error, the alias stays on v2, and `0005` is not recorded.
+If Hugging Face is down halfway: the migration raises an error, the alias stays on v2, and `0006` is not recorded.
 Run `upgrade` again later. Documents already in v3 are overwritten, not duplicated.
 
 **What if the app starts before the migration?** The startup check sees 768 ≠ 1024 and refuses to start. That's on purpose.
@@ -271,7 +276,7 @@ it runs, and old leftover chunks would stay behind. A new collection gives a cle
 
 When the new collection has worked well for a few days:
 
-`vector_migrations/0006_drop_resume_chunks_v1.py`
+`vector_migrations/0007_drop_resume_chunks_v1.py`
 ```python
 """v2 is in use; v1 (MiniLM) is no longer needed."""
 
