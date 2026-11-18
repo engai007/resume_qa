@@ -27,7 +27,7 @@ documents + document_meta_data   ──index──►     resume_chunks  (vector
 | Runner | `app/services/vector_migration_service.py` | Finds pending files and runs them |
 | Command | `scripts/vector_migrate.py` | `upgrade` / `status` |
 | History table | Postgres `vector_migrations` | Remembers which files already ran (like `alembic_version`) |
-| Alias | Qdrant alias `resume_chunks` | The name the app uses. It points to the real collection (`resume_chunks_v3`) |
+| Alias | Qdrant alias `resume_chunks` | The name the app uses. It points to the real collection (`resume_chunks_v4`) |
 | Index version | `INDEX_VERSION` in `app/services/indexing_service.py` | Number stamped on every chunk: "made with chunking X + model Y" |
 | Index status | `documents.indexed_version`, `index_attempts`, `index_error` | Which documents are in Qdrant, and why one failed |
 | Startup check | `check_vector_db()` in `indexing_service.py` | App refuses to start if Qdrant doesn't match the code |
@@ -40,12 +40,14 @@ documents + document_meta_data   ──index──►     resume_chunks  (vector
 | `0002_rebuild_with_bge_base` | Created `resume_chunks_v2` (768 numbers, `BAAI/bge-base-en-v1.5`), re-embedded every document, moved the alias to v2 |
 | `0003_index_document_hash` | Added a payload index on `document_hash` in v2 (search can be limited to given resumes) |
 | `0004_rebuild_one_chunk_per_project` | New chunking (one chunk per project, skills per category in groups of 8): built `resume_chunks_v3` (same model, 768), re-indexed, moved the alias to v3 |
+| `0005_hybrid_dense_and_bm25` | Hybrid search: built `resume_chunks_v4` with two named vectors, `dense` (768, bge) + `bm25` (sparse, IDF), re-indexed, moved the alias to v4 |
 
 ```
-resume_chunks  ──►  resume_chunks_v3   (768, bge-base-en-v1.5, new chunking)   ← in use
+resume_chunks  ──►  resume_chunks_v4   (dense 768 bge-base + bm25 sparse)      ← in use
+                    resume_chunks_v3   (768, bge-base-en-v1.5, new chunking)   ← kept for rollback
                     resume_chunks_v2   (768, bge-base-en-v1.5, old chunking)   ← kept for rollback
                     resume_chunks_v1   (384, MiniLM)             ← old, kept for rollback
-INDEX_VERSION = 3
+INDEX_VERSION = 4
 ```
 
 ---
@@ -72,7 +74,8 @@ applied  0001_create_resume_chunks_v1
 applied  0002_rebuild_with_bge_base
 applied  0003_index_document_hash
 applied  0004_rebuild_one_chunk_per_project
-PENDING  0005_add_index_on_candidate_name      ← will run on next `upgrade`
+applied  0005_hybrid_dense_and_bm25
+PENDING  0006_add_index_on_candidate_name      ← will run on next `upgrade`
 ```
 
 Running `upgrade` twice is safe. The second time it prints `Nothing to apply, already up to date.`
@@ -88,8 +91,9 @@ A rebuild can also take minutes, and app startup shouldn't. Alembic follows the 
 
 | Situation | What happens |
 |---|---|
-| Alias exists, vector size = `EMBEDDING_SIZE` | Starts normally |
+| Alias exists, has `dense` + `bm25`, dense size = `EMBEDDING_SIZE` | Starts normally |
 | Alias missing | **Refuses to start**: `Run: uv run python scripts/vector_migrate.py upgrade` |
+| Alias still on an old one-vector collection (v1-v3) | **Refuses to start**: `has no 'dense' + 'bm25' vectors (needs migration 0005)` |
 | Size doesn't match (e.g. model changed, migration not run) | **Refuses to start**: `has vector size 384, but EMBEDDING_SIZE is 768` |
 | Qdrant is down | Starts with a warning. Uploads still save to Postgres, they just aren't indexed |
 
@@ -110,7 +114,7 @@ The one question to ask: **do the vectors change?**
 | Add / rename a metadata field on chunks | no | small, in place (re-index into the same collection) | yes |
 | Change `make_chunks` (how a resume is split) | **yes** | big, rebuild into a new collection | yes |
 | Change the embedding model | **yes** | big, rebuild into a new collection | yes |
-| Change vector size or distance | **yes** | big, rebuild into a new collection | yes |
+| Change vector size or distance, or the BM25 model (`SPARSE_MODEL`) | **yes** | big, rebuild into a new collection | yes |
 | Delete an old collection | – | cleanup | no |
 | Change `QDRANT_URL`, `HF_TOKEN`, timeouts | no | `.env` only, **no migration** | no |
 | Change `EMBEDDING_PROVIDER` (same model) | no | `.env` only, **no migration** | no |
@@ -132,11 +136,13 @@ async def upgrade(client, db) -> None:   # client = Qdrant, db = Postgres sessio
 
 Rules:
 
-0. **A rebuild must create every payload index the current collection has** (today: `uploaded_by`,
+0. **A rebuild must create both vectors (`dense` + `bm25` with IDF) and every payload index the current collection has** (today: `uploaded_by`,
    `document_id`, `document_hash`). Indexes belong to a collection, so they don't move with the alias.
 1. **Write values out in the file** (`size=768`, `"resume_chunks_v2"`). Don't read them from `settings`.
    The file must do the same thing forever, even after `.env` changes.
 2. **Never edit a migration that has already run** anywhere. Add a new file instead.
+   (Old rebuilds `0002`/`0004` still work on a fresh environment: `index_document` checks the target
+   collection and only writes the `bm25` vector when the collection has one.)
 3. **Make it safe to run again** (`if not await client.collection_exists(...)`). If it crashed halfway,
    the next `upgrade` runs it again.
 4. **If it fails, raise an error.** The runner then doesn't record it, and it runs again next time.
@@ -152,14 +158,14 @@ Each file is recorded right after it succeeds. If `0003` fails, `0001` and `0002
 
 We want fast filtering by candidate name. The vectors don't change, so we update in place.
 
-`vector_migrations/0005_add_index_on_candidate_name.py`
+`vector_migrations/0006_add_index_on_candidate_name.py`
 ```python
 """Fast filter on candidate_name."""
 from qdrant_client import AsyncQdrantClient, models
 
 
 async def upgrade(client: AsyncQdrantClient, db) -> None:
-    await client.create_payload_index("resume_chunks_v3", "candidate_name", models.PayloadSchemaType.KEYWORD)
+    await client.create_payload_index("resume_chunks_v4", "candidate_name", models.PayloadSchemaType.KEYWORD)
 ```
 Deploy: `vector_migrate.py upgrade`. That's it. There's no rebuild and `INDEX_VERSION` stays the same.
 
@@ -171,10 +177,10 @@ We want `user_type` (recruiter / candidate) on every chunk.
 
 1. Add the field in code: `ChunkMetadata` in `app/schemas/chunk.py` and `build_metadata` in `app/services/chunk_service.py`.
    New uploads get it automatically.
-2. Bump `INDEX_VERSION = 4` in `indexing_service.py`.
+2. Bump `INDEX_VERSION = 5` in `indexing_service.py`.
 3. Existing chunks don't have the field yet. Re-index them **into the same collection**, since the vectors are the same size and model:
 
-`vector_migrations/0006_add_user_type_to_chunks.py`
+`vector_migrations/0007_add_user_type_to_chunks.py`
 ```python
 """Re-index every document so its chunks get the new user_type field."""
 from sqlalchemy import select
@@ -189,7 +195,7 @@ async def upgrade(client, db) -> None:
         select(Document, User).join(User, User.id == Document.generated_by)
         .where(Document.is_active).options(selectinload(Document.meta_data))
     )).all()
-    failed = [doc.id for doc, user in rows if not await index_document(db, doc, user, collection="resume_chunks_v3")]
+    failed = [doc.id for doc, user in rows if not await index_document(db, doc, user, collection="resume_chunks_v4")]
     if failed:
         raise RuntimeError(f"could not index documents {failed}, run upgrade again")
 ```
@@ -197,15 +203,15 @@ Re-indexing is safe because point IDs are fixed (`point_id(document_id, chunk_in
 
 ---
 
-### Example C: big change, new embedding model (this is what `0002` did)
+### Example C: big change, new embedding model (this is what `0002` did; shape now as in `0005`)
 
 Say we move from `bge-base-en-v1.5` (768) to a model with 1024 numbers.
 
 **In one commit:**
 
 1. `.env` and `.env.example`: `EMBEDDING_MODEL=<new model>`, `EMBEDDING_SIZE=1024`
-2. `indexing_service.py`: `INDEX_VERSION = 4` (and add it to the comment listing the versions)
-3. New file `vector_migrations/0007_rebuild_with_new_model.py`, the same shape as `0002`:
+2. `indexing_service.py`: `INDEX_VERSION = 5` (and add it to the comment listing the versions)
+3. New file `vector_migrations/0008_rebuild_with_new_model.py`, the same shape as `0005`:
 
 ```python
 """Rebuild with <new model> (1024 numbers)."""
@@ -216,19 +222,23 @@ from sqlalchemy.orm import selectinload
 from app.models import Document, User
 from app.services.indexing_service import index_document
 
-NEW = "resume_chunks_v4"
+NEW = "resume_chunks_v5"
 ALIAS = "resume_chunks"
 
 
 async def upgrade(client: AsyncQdrantClient, db) -> None:
     # 1. new empty collection next to the old one
     if not await client.collection_exists(NEW):
-        await client.create_collection(NEW, vectors_config=models.VectorParams(size=1024, distance=models.Distance.COSINE))
+        await client.create_collection(
+            NEW,
+            vectors_config={"dense": models.VectorParams(size=1024, distance=models.Distance.COSINE)},
+            sparse_vectors_config={"bm25": models.SparseVectorParams(modifier=models.Modifier.IDF)},
+        )
     await client.create_payload_index(NEW, "uploaded_by", models.PayloadSchemaType.INTEGER)
     await client.create_payload_index(NEW, "document_id", models.PayloadSchemaType.INTEGER)
     await client.create_payload_index(NEW, "document_hash", models.PayloadSchemaType.KEYWORD)
 
-    # 2. fill it from Postgres; search keeps using v3 meanwhile
+    # 2. fill it from Postgres; search keeps using v4 meanwhile
     rows = (await db.execute(
         select(Document, User).join(User, User.id == Document.generated_by)
         .where(Document.is_active).options(selectinload(Document.meta_data))
@@ -247,14 +257,14 @@ async def upgrade(client: AsyncQdrantClient, db) -> None:
 **What happens during deploy:**
 
 ```
-before         resume_chunks ──► v3        search works
-upgrade runs   v4 created, filling...      search still on v3, users notice nothing
-alias moved    resume_chunks ──► v4        search now uses the new model
-               v3 kept                     rollback is possible
+before         resume_chunks ──► v4        search works
+upgrade runs   v5 created, filling...      search still on v4, users notice nothing
+alias moved    resume_chunks ──► v5        search now uses the new model
+               v4 kept                     rollback is possible
 ```
 
-If Hugging Face is down halfway: the migration raises an error, the alias stays on v3, and `0007` is not recorded.
-Run `upgrade` again later. Documents already in v4 are overwritten, not duplicated.
+If Hugging Face is down halfway: the migration raises an error, the alias stays on v4, and `0008` is not recorded.
+Run `upgrade` again later. Documents already in v5 are overwritten, not duplicated.
 
 **What if the app starts before the migration?** The startup check sees 768 ≠ 1024 and refuses to start. That's on purpose.
 
@@ -267,7 +277,7 @@ The chunks are different, so their vectors are different too. This is the same a
 
 - edit `app/services/resume_chunker.py`
 - bump `INDEX_VERSION`
-- new migration builds `resume_chunks_v4` with the **same** size as now (768), re-indexes and moves the alias
+- new migration builds `resume_chunks_v5` with the **same** size as now (768), re-indexes and moves the alias
 - `.env` doesn't change
 
 Why a new collection, even though the size is the same? Rebuilding in place would mix old and new chunks while
@@ -279,9 +289,9 @@ it runs, and old leftover chunks would stay behind. A new collection gives a cle
 
 When the new collection has worked well for a few days:
 
-`vector_migrations/0008_drop_resume_chunks_v1.py`
+`vector_migrations/0009_drop_resume_chunks_v1.py`
 ```python
-"""v3 is in use; v1 (MiniLM) is no longer needed."""
+"""v4 is in use; v1 (MiniLM) is no longer needed."""
 
 
 async def upgrade(client, db) -> None:
@@ -331,7 +341,7 @@ Find them:
 ```sql
 select id, indexed_version, index_attempts, index_error
 from documents
-where indexed_version is null or indexed_version < 3;   -- 3 = current INDEX_VERSION
+where indexed_version is null or indexed_version < 4;   -- 4 = current INDEX_VERSION
 ```
 
 ---

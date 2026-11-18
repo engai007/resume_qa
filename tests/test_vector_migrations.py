@@ -1,7 +1,7 @@
 import asyncio
 
 import pytest
-from qdrant_client import AsyncQdrantClient
+from qdrant_client import AsyncQdrantClient, models
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -9,15 +9,14 @@ from app.core.config import settings
 from app.models import Document, DocumentMetaData, User, UserType
 from app.services import indexing_service
 from app.services import vector_migration_service as vm
-from tests.conftest import create_test_db, fake_embed
+from tests.conftest import create_test_db, use_fake_vectors
 
 
 @pytest.fixture
 def setup(tmp_path, monkeypatch):
     """Empty in-memory Qdrant + SQLite DB, fake embeddings."""
     client = AsyncQdrantClient(":memory:")
-    monkeypatch.setattr(indexing_service, "qdrant", client)
-    monkeypatch.setattr(indexing_service, "embed_texts", fake_embed)
+    use_fake_vectors(monkeypatch, client)
     engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path}/t.db")
     asyncio.run(create_test_db(engine))
     return client, async_sessionmaker(engine, expire_on_commit=False)
@@ -50,8 +49,9 @@ def test_upgrade_runs_each_migration_once(setup):
     first, second, left = asyncio.run(go())
     assert first == [f.stem for f in vm.migration_files()]
     assert second == [] and left == []
-    info = asyncio.run(client.get_collection(settings.qdrant_collection))  # via the alias
-    assert info.config.params.vectors.size == settings.embedding_size  # last migration matches the model
+    params = asyncio.run(client.get_collection(settings.qdrant_collection)).config.params  # via the alias
+    assert params.vectors["dense"].size == settings.embedding_size  # last migration matches the model
+    assert params.sparse_vectors["bm25"].modifier == models.Modifier.IDF
 
 
 def test_rebuilds_reindex_documents_and_move_alias_to_latest(setup):
@@ -65,8 +65,11 @@ def test_rebuilds_reindex_documents_and_move_alias_to_latest(setup):
             return doc
 
     doc = asyncio.run(go())
-    assert alias_target(client) == "resume_chunks_v3"  # 0002 moved it to v2, then 0004 to v3
-    assert asyncio.run(client.count("resume_chunks_v3")).count == 2  # profile + skills chunks
+    assert alias_target(client) == "resume_chunks_v4"  # 0002 -> v2, 0004 -> v3, 0005 -> v4
+    for name in ("resume_chunks_v2", "resume_chunks_v3", "resume_chunks_v4"):  # old layouts still indexed fine
+        assert asyncio.run(client.count(name)).count == 2  # profile + skills chunks
+    [point], _ = asyncio.run(client.scroll("resume_chunks_v4", limit=1, with_vectors=True))
+    assert set(point.vector) == {"dense", "bm25"}  # both vectors in one point
     assert doc.indexed_version == indexing_service.INDEX_VERSION
 
 

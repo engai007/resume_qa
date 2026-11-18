@@ -6,7 +6,7 @@ from qdrant_client import models
 
 from app.core.config import settings
 from app.db.qdrant import qdrant
-from app.embeddings import embed_texts
+from app.embeddings import embed_texts, sparse_embed_texts
 from app.models import Document, User
 from app.services.chunk_service import build_chunks
 
@@ -14,8 +14,12 @@ logger = logging.getLogger(__name__)
 
 # Bump when chunking or the embedding model changes (together with a new vector migration).
 # 1 = all-MiniLM-L6-v2 (local), 2 = BAAI/bge-base-en-v1.5 (HF Inference),
-# 3 = one chunk per project + skills per category in groups of 8
-INDEX_VERSION = 3
+# 3 = one chunk per project + skills per category in groups of 8,
+# 4 = hybrid: named vectors "dense" (bge) + "bm25" (sparse)
+INDEX_VERSION = 4
+
+DENSE = "dense"
+SPARSE = "bm25"
 
 
 def point_id(document_id: int, chunk_index: int) -> str:
@@ -30,7 +34,11 @@ async def index_document(db, doc: Document, user: User, collection: str | None =
     collection = collection or settings.qdrant_collection
     try:
         chunks = build_chunks(doc, user)
-        vectors = await embed_texts([c.text for c in chunks])
+        texts = [c.text for c in chunks]
+        vectors = await embed_texts(texts)
+        if await is_hybrid(collection):  # v4+: {"dense": [...], "bm25": SparseVector}
+            sparse = await sparse_embed_texts(texts)
+            vectors = [{DENSE: d, SPARSE: s} for d, s in zip(vectors, sparse)]
         points = [
             models.PointStruct(
                 id=point_id(doc.id, c.metadata.chunk_index),
@@ -57,18 +65,28 @@ async def index_document(db, doc: Document, user: User, collection: str | None =
     return True
 
 
+async def is_hybrid(collection: str) -> bool:
+    """True for collections with named dense + bm25 vectors (v4+). Older ones (v1-v3) have one unnamed
+    vector; old rebuild migrations (0002, 0004) still index into those on a fresh environment."""
+    params = (await qdrant.get_collection(collection)).config.params
+    return isinstance(params.vectors, dict) and SPARSE in (params.sparse_vectors or {})
+
+
 async def check_vector_db() -> None:
-    """Called on app start. Fails if the collection is missing or has the wrong vector size.
+    """Called on app start. Fails if the collection is missing, isn't hybrid, or has the wrong vector size.
     If Qdrant is just down, only warns: uploads still work and are indexed later."""
     name = settings.qdrant_collection
+    upgrade = "Run: uv run python scripts/vector_migrate.py upgrade"
     try:
         exists = await qdrant.collection_exists(name)
     except Exception as e:
         logger.warning("Qdrant not reachable at %s (%s). Uploads will not be indexed.", settings.qdrant_url, e)
         return
     if not exists:
-        raise RuntimeError(f"Qdrant collection '{name}' missing. Run: uv run python scripts/vector_migrate.py upgrade")
-    size = (await qdrant.get_collection(name)).config.params.vectors.size
+        raise RuntimeError(f"Qdrant collection '{name}' missing. {upgrade}")
+    if not await is_hybrid(name):
+        raise RuntimeError(f"Qdrant '{name}' has no '{DENSE}' + '{SPARSE}' vectors (needs migration 0005). {upgrade}")
+    size = (await qdrant.get_collection(name)).config.params.vectors[DENSE].size
     if size != settings.embedding_size:
         raise RuntimeError(f"Qdrant '{name}' has vector size {size}, but EMBEDDING_SIZE is {settings.embedding_size}. "
                            "A model change needs a new vector migration.")

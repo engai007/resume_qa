@@ -1,10 +1,14 @@
 """Evaluate retrieval against the golden dataset, using the real Qdrant + embeddings.
 
-    uv run python evals/retrieval_eval.py                          # evals/retrieval_golden.json, top_k 5
+    uv run python evals/retrieval_eval.py                          # hybrid, evals/retrieval_golden.json, top_k 5
+    uv run python evals/retrieval_eval.py --mode dense             # or sparse: compare search modes
     uv run python evals/retrieval_eval.py --top-k 3
     uv run python evals/retrieval_eval.py --golden evals/other.json --threshold 0.5
 
-Prints a report and saves it to outputs/evals/<date>__<model>__v<index_version>__k<top_k>.json
+Prints a report and saves it to outputs/evals/<date>__<model>__v<index_version>__k<top_k>__<mode>.json
+
+No-answer questions always use a dense search: its score is a similarity (0..1) that can be compared with
+the threshold. Hybrid scores are RRF ranks, and the best chunk always gets a high one, even for "COBOL?".
 """
 import argparse
 import asyncio
@@ -44,7 +48,7 @@ async def find_user(email: str, hashes: list[str]) -> User:
     return user
 
 
-async def run(golden_path: Path, k: int, threshold: float) -> dict:
+async def run(golden_path: Path, k: int, threshold: float, mode: str) -> dict:
     golden = json.loads(golden_path.read_text(encoding="utf-8"))
     hashes = list(golden["documents"].values())
     user = await find_user(golden["search_as_user"], hashes)
@@ -52,7 +56,8 @@ async def run(golden_path: Path, k: int, threshold: float) -> dict:
     answered, no_answer = [], []
     for q in golden["questions"]:
         # search only the golden resumes, so other uploads by this user can't change the score
-        results = await search_chunks(user.id, q["question"], top_k=k, document_hashes=hashes)
+        q_mode = mode if q["expected"] else "dense"  # see the note at the top
+        results = await search_chunks(user.id, q["question"], top_k=k, document_hashes=hashes, mode=q_mode)
         retrieved = [{"rank": i, "score": r["score"], "document_hash": r["document_hash"][:12],
                       "first_line": r["text"].splitlines()[0]} for i, r in enumerate(results, start=1)]
         if q["expected"]:
@@ -75,6 +80,7 @@ async def run(golden_path: Path, k: int, threshold: float) -> dict:
         "golden_version": golden.get("version"),
         "embedding_model": settings.embedding_model,
         "index_version": INDEX_VERSION,
+        "mode": mode,
         "top_k": k,
         "no_answer_threshold": threshold,
         "overall": {"questions": len(answered), **average(answered)},
@@ -87,7 +93,7 @@ async def run(golden_path: Path, k: int, threshold: float) -> dict:
 
 def print_report(r: dict) -> None:
     print(f"\nRetrieval eval  {r['date']}  model: {r['embedding_model']}  "
-          f"index_version: {r['index_version']}  top_k: {r['top_k']}")
+          f"index_version: {r['index_version']}  mode: {r['mode']}  top_k: {r['top_k']}")
     k = r["top_k"]
     print(f"\n{'':16}{'n':>4}  {'hit@' + str(k):>7}  {'recall@' + str(k):>9}  {'precision@' + str(k):>12}  {'MRR':>6}")
     rows = [("overall", r["overall"])] + sorted(r["by_type"].items())
@@ -95,7 +101,7 @@ def print_report(r: dict) -> None:
         print(f"{name:16}{m['questions']:>4}  {m['hit']:>7.2f}  {m['recall']:>9.2f}  {m['precision']:>12.2f}  {m['mrr']:>6.2f}")
 
     na = r["no_answer"]
-    print(f"\nno-answer accuracy (top score < {r['no_answer_threshold']}): {na['passed']}/{na['questions']}")
+    print(f"\nno-answer accuracy (dense top score < {r['no_answer_threshold']}): {na['passed']}/{na['questions']}")
     for q in r["no_answer_questions"]:
         print(f"  {'ok  ' if q['passed'] else 'FAIL'}  {q['id']}  top score {q['top_score']:.3f}  {q['question']}")
 
@@ -113,10 +119,11 @@ if __name__ == "__main__":
     parser.add_argument("--golden", type=Path, default=ROOT / "evals" / "retrieval_golden.json")
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--threshold", type=float, default=0.45, help="no-answer questions pass below this score")
+    parser.add_argument("--mode", choices=["hybrid", "dense", "sparse"], default="hybrid")
     args = parser.parse_args()
 
     async def main():
-        report = await run(args.golden, args.top_k, args.threshold)
+        report = await run(args.golden, args.top_k, args.threshold, args.mode)
         await qdrant.close()
         await engine.dispose()
         return report
@@ -127,6 +134,6 @@ if __name__ == "__main__":
     out_dir = ROOT / settings.parser_output_dir / "evals"
     out_dir.mkdir(parents=True, exist_ok=True)
     model = settings.embedding_model.split("/")[-1]
-    out_file = out_dir / f"{report['date']}__{model}__v{report['index_version']}__k{report['top_k']}.json"
+    out_file = out_dir / f"{report['date']}__{model}__v{report['index_version']}__k{report['top_k']}__{report['mode']}.json"
     out_file.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"\nsaved: {out_file.relative_to(ROOT)}")
