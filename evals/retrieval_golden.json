@@ -1,0 +1,231 @@
+{
+  "name": "resume retrieval golden set",
+  "version": 1,
+  "created": "2026-11-17",
+  "search_as_user": "yogesh@gmail.com",
+  "matching": "A retrieved chunk is correct when its document_hash equals the expected document's hash AND its text contains the `contains` snippet (exact, case-sensitive). Every relevant chunk is listed, so recall can be measured.",
+  "documents": {
+    "resume_a": "1fa32fbbdab0dabd1e02d5f5d68f6cd2c495ca5a0961ef0d57bd536c2b9afffe",
+    "resume_b": "fa1228b0fba39cd05261f5e56aacf8704e43358804d35e3d91a69c2372622d32"
+  },
+  "questions": [
+    {
+      "id": "q01",
+      "type": "skill",
+      "question": "Which vector databases has the candidate worked with?",
+      "expected": [
+        {"document": "resume_a", "contains": "Qdrant, ChromaDB"},
+        {"document": "resume_b", "contains": "VectorDB"}
+      ]
+    },
+    {
+      "id": "q02",
+      "type": "skill",
+      "question": "Who has experience with LangGraph?",
+      "expected": [
+        {"document": "resume_a", "contains": "LangChain, LangGraph"},
+        {"document": "resume_a", "contains": "Multi-Agent LangGraph System"}
+      ]
+    },
+    {
+      "id": "q03",
+      "type": "skill",
+      "question": "Experience with Kubernetes and Docker",
+      "expected": [
+        {"document": "resume_a", "contains": "DevOps Tools: Kubernetes"},
+        {"document": "resume_b", "contains": "DevOps Tools: Kubernetes"}
+      ]
+    },
+    {
+      "id": "q04",
+      "type": "skill",
+      "question": "Who has worked with RabbitMQ or message queues?",
+      "expected": [
+        {"document": "resume_a", "contains": "async messaging (RabbitMQ)"},
+        {"document": "resume_b", "contains": "async messaging (RabbitMQ)"},
+        {"document": "resume_a", "contains": "RabbitMQ-based asynchronous"},
+        {"document": "resume_b", "contains": "RabbitMQ-based asynchronous"},
+        {"document": "resume_a", "contains": "Message Queues"},
+        {"document": "resume_b", "contains": "Message Queues"}
+      ]
+    },
+    {
+      "id": "q05",
+      "type": "skill",
+      "question": "Experience with AWS Lambda and Step Functions",
+      "expected": [
+        {"document": "resume_a", "contains": "Lambda, Step Function"},
+        {"document": "resume_b", "contains": "Lambda, Step Function"}
+      ]
+    },
+    {
+      "id": "q06",
+      "type": "skill",
+      "question": "Who has worked with Spark or Hadoop?",
+      "expected": [
+        {"document": "resume_b", "contains": "Pyspark, Apache Spark"}
+      ]
+    },
+    {
+      "id": "q07",
+      "type": "paraphrase",
+      "question": "Who has built systems where multiple AI agents work together?",
+      "expected": [
+        {"document": "resume_a", "contains": "Multi-Agent LangGraph System"},
+        {"document": "resume_a", "contains": "Multi-Agent Systems"}
+      ]
+    },
+    {
+      "id": "q08",
+      "type": "paraphrase",
+      "question": "Any experience checking that videos are delivered and playable?",
+      "expected": [
+        {"document": "resume_a", "contains": "media delivery workflows"},
+        {"document": "resume_b", "contains": "media delivery workflows"},
+        {"document": "resume_a", "contains": "register new media assets"},
+        {"document": "resume_b", "contains": "register new media assets"}
+      ]
+    },
+    {
+      "id": "q09",
+      "type": "paraphrase",
+      "question": "Who has built a system that suggests movies or shows to users?",
+      "expected": [
+        {"document": "resume_a", "contains": "IHRE (Recommendation Engine)"},
+        {"document": "resume_b", "contains": "IHRE (Recommendation Engine)"},
+        {"document": "resume_a", "contains": "recommendation engines for movies"},
+        {"document": "resume_b", "contains": "recommendation engines for movies"}
+      ]
+    },
+    {
+      "id": "q10",
+      "type": "paraphrase",
+      "question": "Who has measured the quality of a RAG system?",
+      "expected": [
+        {"document": "resume_a", "contains": "RAGAS + DeepEval"},
+        {"document": "resume_a", "contains": "Guardrails, RAGAS"}
+      ]
+    },
+    {
+      "id": "q11",
+      "type": "company",
+      "question": "What did the candidate do at Tradeindia?",
+      "expected": [
+        {"document": "resume_a", "contains": "Experience: Tradeindia"},
+        {"document": "resume_b", "contains": "Experience: Tradeindia"},
+        {"document": "resume_a", "contains": "Best Employee Award"},
+        {"document": "resume_b", "contains": "Best Employee Award"}
+      ]
+    },
+    {
+      "id": "q12",
+      "type": "company",
+      "question": "Work done at Infinite Computer Solutions",
+      "expected": [
+        {"document": "resume_a", "contains": "Experience: Infinite Computer"},
+        {"document": "resume_b", "contains": "Experience: Infinite Computer"},
+        {"document": "resume_a", "contains": "Best Employee Award"},
+        {"document": "resume_b", "contains": "Best Employee Award"}
+      ]
+    },
+    {
+      "id": "q13",
+      "type": "company",
+      "question": "What did the candidate work on at Verticurl?",
+      "expected": [
+        {"document": "resume_a", "contains": "Verticurl"}
+      ]
+    },
+    {
+      "id": "q14",
+      "type": "project",
+      "question": "Who has built ETL pipelines feeding Redshift reports?",
+      "expected": [
+        {"document": "resume_a", "contains": "Redshift-based reporting"},
+        {"document": "resume_b", "contains": "Redshift-based reporting"}
+      ]
+    },
+    {
+      "id": "q15",
+      "type": "project",
+      "question": "Who built a real-time chat system with WebSockets?",
+      "expected": [
+        {"document": "resume_a", "contains": "Real-time Chatting"},
+        {"document": "resume_b", "contains": "Real-time Chatting"},
+        {"document": "resume_a", "contains": "WebSockets & Asterisk"},
+        {"document": "resume_b", "contains": "WebSockets & Asterisk"}
+      ]
+    },
+    {
+      "id": "q16",
+      "type": "project",
+      "question": "Experience building role-based access control",
+      "expected": [
+        {"document": "resume_a", "contains": "hierarchical RBAC"}
+      ]
+    },
+    {
+      "id": "q17",
+      "type": "education",
+      "question": "Where did Yogesh study?",
+      "expected": [
+        {"document": "resume_a", "contains": "Delhi technological University"},
+        {"document": "resume_b", "contains": "Delhi technological University"}
+      ]
+    },
+    {
+      "id": "q18",
+      "type": "education",
+      "question": "Which candidates have an electrical engineering degree?",
+      "expected": [
+        {"document": "resume_a", "contains": "Bachelor of Technology EEE"},
+        {"document": "resume_b", "contains": "Bachelor of Technology EEE"}
+      ]
+    },
+    {
+      "id": "q19",
+      "type": "publication",
+      "question": "Any research papers on power quality or signal processing?",
+      "expected": [
+        {"document": "resume_a", "contains": "Discrete Wavelet Transform"},
+        {"document": "resume_b", "contains": "Discrete Wavelet Transform"}
+      ]
+    },
+    {
+      "id": "q20",
+      "type": "award",
+      "question": "Has the candidate received any recognition at work?",
+      "expected": [
+        {"document": "resume_a", "contains": "Best Employee Award"},
+        {"document": "resume_b", "contains": "Best Employee Award"}
+      ]
+    },
+    {
+      "id": "q21",
+      "type": "profile",
+      "question": "Who is based in Delhi?",
+      "expected": [
+        {"document": "resume_a", "contains": "Location: Delhi"},
+        {"document": "resume_b", "contains": "Location: Delhi"}
+      ]
+    },
+    {
+      "id": "q22",
+      "type": "no_answer",
+      "question": "Who knows COBOL and mainframes?",
+      "expected": []
+    },
+    {
+      "id": "q23",
+      "type": "no_answer",
+      "question": "Who has worked as a nurse?",
+      "expected": []
+    },
+    {
+      "id": "q24",
+      "type": "no_answer",
+      "question": "Experience building iOS apps in Swift?",
+      "expected": []
+    }
+  ]
+}
