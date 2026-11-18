@@ -1,7 +1,8 @@
 {
   "name": "resume retrieval golden set",
-  "version": 1,
+  "version": 2,
   "created": "2026-11-17",
+  "updated": "2026-11-18 - INDEX_VERSION 3: company questions point to each project chunk",
   "search_as_user": "yogesh@gmail.com",
   "matching": "A retrieved chunk is correct when its document_hash equals the expected document's hash AND its text contains the `contains` snippet (exact, case-sensitive). Every relevant chunk is listed, so recall can be measured.",
   "documents": {
@@ -111,8 +112,12 @@
       "type": "company",
       "question": "What did the candidate do at Tradeindia?",
       "expected": [
-        {"document": "resume_a", "contains": "Experience: Tradeindia"},
-        {"document": "resume_b", "contains": "Experience: Tradeindia"},
+        {"document": "resume_a", "contains": "Project: AELMS"},
+        {"document": "resume_b", "contains": "Project: AELMS"},
+        {"document": "resume_a", "contains": "Project: Real-time Chatting"},
+        {"document": "resume_b", "contains": "Project: Real-time Chatting"},
+        {"document": "resume_a", "contains": "Project: Sales Force Automation"},
+        {"document": "resume_b", "contains": "Project: Sales Force Automation"},
         {"document": "resume_a", "contains": "Best Employee Award"},
         {"document": "resume_b", "contains": "Best Employee Award"}
       ]
@@ -122,8 +127,10 @@
       "type": "company",
       "question": "Work done at Infinite Computer Solutions",
       "expected": [
-        {"document": "resume_a", "contains": "Experience: Infinite Computer"},
-        {"document": "resume_b", "contains": "Experience: Infinite Computer"},
+        {"document": "resume_a", "contains": "Project: QC (Quality Check)"},
+        {"document": "resume_b", "contains": "Project: QC (Quality Check)"},
+        {"document": "resume_a", "contains": "Project: IHRE"},
+        {"document": "resume_b", "contains": "Project: IHRE"},
         {"document": "resume_a", "contains": "Best Employee Award"},
         {"document": "resume_b", "contains": "Best Employee Award"}
       ]

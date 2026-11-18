@@ -54,7 +54,7 @@ def test_upgrade_runs_each_migration_once(setup):
     assert info.config.params.vectors.size == settings.embedding_size  # last migration matches the model
 
 
-def test_0002_reindexes_documents_and_moves_alias(setup):
+def test_rebuilds_reindex_documents_and_move_alias_to_latest(setup):
     client, session = setup
 
     async def go():
@@ -65,8 +65,8 @@ def test_0002_reindexes_documents_and_moves_alias(setup):
             return doc
 
     doc = asyncio.run(go())
-    assert alias_target(client) == "resume_chunks_v2"
-    assert asyncio.run(client.count("resume_chunks_v2")).count == 2  # profile + skills chunks
+    assert alias_target(client) == "resume_chunks_v3"  # 0002 moved it to v2, then 0004 to v3
+    assert asyncio.run(client.count("resume_chunks_v3")).count == 2  # profile + skills chunks
     assert doc.indexed_version == indexing_service.INDEX_VERSION
 
 

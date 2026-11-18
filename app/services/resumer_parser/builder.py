@@ -1,4 +1,6 @@
 """Step 5: turn line pointers into the final resume JSON."""
+import re
+
 from app.services.resumer_parser.patterns import BULLETS
 
 
@@ -11,15 +13,22 @@ def lines_in(rng: list | None, texts: list[str]) -> list[str]:
             if (t := texts[i].lstrip(BULLETS).strip())]
 
 
+SKILL_SEPARATORS = re.compile(r"[,|•·;]")  # "Python, SQL" / "Python | SQL" / "Python • SQL" ...
+
+
+def split_skills(text: str) -> list[str]:
+    return [s.strip() for s in SKILL_SEPARATORS.split(text) if s.strip()]
+
+
 def parse_skills(skill_lines: list[str]) -> dict[str, list[str]]:
-    """'Languages: Python, SQL' -> {'Languages': ['Python', 'SQL']}"""
+    """'Languages: Python, SQL' -> {'Languages': ['Python', 'SQL']}; lines without a category -> 'Other'."""
     skills: dict[str, list[str]] = {}
     for l in skill_lines:
         if ":" in l:
             cat, items = l.split(":", 1)
-            skills[cat.strip()] = [s.strip() for s in items.strip(": ").split(",") if s.strip()]
+            skills[cat.strip()] = split_skills(items.strip(": "))
         else:
-            skills.setdefault("Other", []).extend(s.strip() for s in l.split(",") if s.strip())
+            skills.setdefault("Other", []).extend(split_skills(l))
     return skills
 
 
