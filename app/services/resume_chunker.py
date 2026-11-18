@@ -1,9 +1,18 @@
+SKILLS_PER_CHUNK = 8  # a long skill list is split, so each chunk's vector stays about a few skills
+
+
 def lines_to_text(lines):
     return "\n".join(f"- {l}" for l in lines or [])
 
 
+def in_groups(items: list, size: int) -> list[list]:
+    """[1..10], 8 -> [[1..8], [9, 10]]"""
+    return [items[i:i + size] for i in range(0, len(items), size)]
+
+
 def make_chunks(r: dict) -> list[str]:
-    """Parsed resume dict -> list of text chunks (one per section / company / project)."""
+    """Parsed resume dict -> list of text chunks. One topic per chunk, so its vector stays focused:
+    profile, each skill category (in groups), each company project, each education, ..."""
     chunks = []
 
     # profile
@@ -21,21 +30,22 @@ def make_chunks(r: dict) -> list[str]:
         profile += f"\nSummary: {r['summary']}"
     chunks.append(profile)
 
-    # skills
-    if r.get("skills"):
-        chunks.append("Skills\n" + "\n".join(f"{cat}: {', '.join(items)}"
-                                             for cat, items in r["skills"].items()))
+    # skills: one chunk per category; long lists (e.g. uncategorized "Other") split into groups
+    for cat, items in (r.get("skills") or {}).items():
+        label = "Skills" if cat == "Other" else f"Skills - {cat}"
+        for group in in_groups(items, SKILLS_PER_CHUNK):
+            chunks.append(f"{label}: {', '.join(group)}")
 
-    # experience: ONE chunk per company, with all its projects inside
+    # experience: one chunk per project, each repeating the company header
     for e in r.get("experience") or []:
-        text = f"Experience: {e.get('company')}\nStart: {e.get('start')}\nEnd: {e.get('end')}"
+        header = f"Experience: {e.get('company')}\nStart: {e.get('start')}\nEnd: {e.get('end')}"
         if e.get("role"):
-            text += f"\nRole: {e['role']}"
-        if e.get("details"):
-            text += "\n" + lines_to_text(e["details"])
-        for p in e.get("projects") or []:
-            text += f"\n\nProject: {p.get('name')}\n{lines_to_text(p.get('details'))}"
-        chunks.append(text)
+            header += f"\nRole: {e['role']}"
+        projects = e.get("projects") or []
+        if e.get("details") or not projects:  # bullets not under a project, or a company without projects
+            chunks.append(header + (f"\n{lines_to_text(e['details'])}" if e.get("details") else ""))
+        for p in projects:
+            chunks.append(f"{header}\nProject: {p.get('name')}\n{lines_to_text(p.get('details'))}")
 
     # education
     for ed in r.get("education") or []:

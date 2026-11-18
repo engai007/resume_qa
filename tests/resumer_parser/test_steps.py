@@ -75,6 +75,13 @@ def test_parse_skills():
     }
 
 
+def test_parse_skills_other_separators():
+    assert parse_skills(["Python | SQL • Docker; Git", "Tools: Jira · Figma"]) == {
+        "Other": ["Python", "SQL", "Docker", "Git"],
+        "Tools": ["Jira", "Figma"],
+    }
+
+
 TEXTS = [
     "Jane Doe",                       # 0
     "Experience",                     # 1

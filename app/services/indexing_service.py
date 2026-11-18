@@ -13,8 +13,9 @@ from app.services.chunk_service import build_chunks
 logger = logging.getLogger(__name__)
 
 # Bump when chunking or the embedding model changes (together with a new vector migration).
-# 1 = all-MiniLM-L6-v2 (local), 2 = BAAI/bge-base-en-v1.5 (HF Inference)
-INDEX_VERSION = 2
+# 1 = all-MiniLM-L6-v2 (local), 2 = BAAI/bge-base-en-v1.5 (HF Inference),
+# 3 = one chunk per project + skills per category in groups of 8
+INDEX_VERSION = 3
 
 
 def point_id(document_id: int, chunk_index: int) -> str:

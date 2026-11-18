@@ -27,7 +27,7 @@ documents + document_meta_data   ──index──►     resume_chunks  (vector
 | Runner | `app/services/vector_migration_service.py` | Finds pending files and runs them |
 | Command | `scripts/vector_migrate.py` | `upgrade` / `status` |
 | History table | Postgres `vector_migrations` | Remembers which files already ran (like `alembic_version`) |
-| Alias | Qdrant alias `resume_chunks` | The name the app uses. It points to the real collection (`resume_chunks_v2`) |
+| Alias | Qdrant alias `resume_chunks` | The name the app uses. It points to the real collection (`resume_chunks_v3`) |
 | Index version | `INDEX_VERSION` in `app/services/indexing_service.py` | Number stamped on every chunk: "made with chunking X + model Y" |
 | Index status | `documents.indexed_version`, `index_attempts`, `index_error` | Which documents are in Qdrant, and why one failed |
 | Startup check | `check_vector_db()` in `indexing_service.py` | App refuses to start if Qdrant doesn't match the code |
@@ -39,11 +39,13 @@ documents + document_meta_data   ──index──►     resume_chunks  (vector
 | `0001_create_resume_chunks_v1` | Created `resume_chunks_v1` (384 numbers, all-MiniLM-L6-v2), indexes, alias |
 | `0002_rebuild_with_bge_base` | Created `resume_chunks_v2` (768 numbers, `BAAI/bge-base-en-v1.5`), re-embedded every document, moved the alias to v2 |
 | `0003_index_document_hash` | Added a payload index on `document_hash` in v2 (search can be limited to given resumes) |
+| `0004_rebuild_one_chunk_per_project` | New chunking (one chunk per project, skills per category in groups of 8): built `resume_chunks_v3` (same model, 768), re-indexed, moved the alias to v3 |
 
 ```
-resume_chunks  ──►  resume_chunks_v2   (768, bge-base-en-v1.5)   ← in use
+resume_chunks  ──►  resume_chunks_v3   (768, bge-base-en-v1.5, new chunking)   ← in use
+                    resume_chunks_v2   (768, bge-base-en-v1.5, old chunking)   ← kept for rollback
                     resume_chunks_v1   (384, MiniLM)             ← old, kept for rollback
-INDEX_VERSION = 2
+INDEX_VERSION = 3
 ```
 
 ---
@@ -69,7 +71,8 @@ uv run python scripts/vector_migrate.py status
 applied  0001_create_resume_chunks_v1
 applied  0002_rebuild_with_bge_base
 applied  0003_index_document_hash
-PENDING  0004_add_index_on_candidate_name      ← will run on next `upgrade`
+applied  0004_rebuild_one_chunk_per_project
+PENDING  0005_add_index_on_candidate_name      ← will run on next `upgrade`
 ```
 
 Running `upgrade` twice is safe. The second time it prints `Nothing to apply, already up to date.`
@@ -149,14 +152,14 @@ Each file is recorded right after it succeeds. If `0003` fails, `0001` and `0002
 
 We want fast filtering by candidate name. The vectors don't change, so we update in place.
 
-`vector_migrations/0004_add_index_on_candidate_name.py`
+`vector_migrations/0005_add_index_on_candidate_name.py`
 ```python
 """Fast filter on candidate_name."""
 from qdrant_client import AsyncQdrantClient, models
 
 
 async def upgrade(client: AsyncQdrantClient, db) -> None:
-    await client.create_payload_index("resume_chunks_v2", "candidate_name", models.PayloadSchemaType.KEYWORD)
+    await client.create_payload_index("resume_chunks_v3", "candidate_name", models.PayloadSchemaType.KEYWORD)
 ```
 Deploy: `vector_migrate.py upgrade`. That's it. There's no rebuild and `INDEX_VERSION` stays the same.
 
@@ -168,10 +171,10 @@ We want `user_type` (recruiter / candidate) on every chunk.
 
 1. Add the field in code: `ChunkMetadata` in `app/schemas/chunk.py` and `build_metadata` in `app/services/chunk_service.py`.
    New uploads get it automatically.
-2. Bump `INDEX_VERSION = 3` in `indexing_service.py`.
+2. Bump `INDEX_VERSION = 4` in `indexing_service.py`.
 3. Existing chunks don't have the field yet. Re-index them **into the same collection**, since the vectors are the same size and model:
 
-`vector_migrations/0005_add_user_type_to_chunks.py`
+`vector_migrations/0006_add_user_type_to_chunks.py`
 ```python
 """Re-index every document so its chunks get the new user_type field."""
 from sqlalchemy import select
@@ -186,7 +189,7 @@ async def upgrade(client, db) -> None:
         select(Document, User).join(User, User.id == Document.generated_by)
         .where(Document.is_active).options(selectinload(Document.meta_data))
     )).all()
-    failed = [doc.id for doc, user in rows if not await index_document(db, doc, user, collection="resume_chunks_v2")]
+    failed = [doc.id for doc, user in rows if not await index_document(db, doc, user, collection="resume_chunks_v3")]
     if failed:
         raise RuntimeError(f"could not index documents {failed}, run upgrade again")
 ```
@@ -201,8 +204,8 @@ Say we move from `bge-base-en-v1.5` (768) to a model with 1024 numbers.
 **In one commit:**
 
 1. `.env` and `.env.example`: `EMBEDDING_MODEL=<new model>`, `EMBEDDING_SIZE=1024`
-2. `indexing_service.py`: `INDEX_VERSION = 3` (and add it to the comment listing the versions)
-3. New file `vector_migrations/0006_rebuild_with_new_model.py`, the same shape as `0002`:
+2. `indexing_service.py`: `INDEX_VERSION = 4` (and add it to the comment listing the versions)
+3. New file `vector_migrations/0007_rebuild_with_new_model.py`, the same shape as `0002`:
 
 ```python
 """Rebuild with <new model> (1024 numbers)."""
@@ -213,7 +216,7 @@ from sqlalchemy.orm import selectinload
 from app.models import Document, User
 from app.services.indexing_service import index_document
 
-NEW = "resume_chunks_v3"
+NEW = "resume_chunks_v4"
 ALIAS = "resume_chunks"
 
 
@@ -225,7 +228,7 @@ async def upgrade(client: AsyncQdrantClient, db) -> None:
     await client.create_payload_index(NEW, "document_id", models.PayloadSchemaType.INTEGER)
     await client.create_payload_index(NEW, "document_hash", models.PayloadSchemaType.KEYWORD)
 
-    # 2. fill it from Postgres; search keeps using v2 meanwhile
+    # 2. fill it from Postgres; search keeps using v3 meanwhile
     rows = (await db.execute(
         select(Document, User).join(User, User.id == Document.generated_by)
         .where(Document.is_active).options(selectinload(Document.meta_data))
@@ -244,14 +247,14 @@ async def upgrade(client: AsyncQdrantClient, db) -> None:
 **What happens during deploy:**
 
 ```
-before         resume_chunks ──► v2        search works
-upgrade runs   v3 created, filling...      search still on v2, users notice nothing
-alias moved    resume_chunks ──► v3        search now uses the new model
-               v2 kept                     rollback is possible
+before         resume_chunks ──► v3        search works
+upgrade runs   v4 created, filling...      search still on v3, users notice nothing
+alias moved    resume_chunks ──► v4        search now uses the new model
+               v3 kept                     rollback is possible
 ```
 
-If Hugging Face is down halfway: the migration raises an error, the alias stays on v2, and `0006` is not recorded.
-Run `upgrade` again later. Documents already in v3 are overwritten, not duplicated.
+If Hugging Face is down halfway: the migration raises an error, the alias stays on v3, and `0007` is not recorded.
+Run `upgrade` again later. Documents already in v4 are overwritten, not duplicated.
 
 **What if the app starts before the migration?** The startup check sees 768 ≠ 1024 and refuses to start. That's on purpose.
 
@@ -264,7 +267,7 @@ The chunks are different, so their vectors are different too. This is the same a
 
 - edit `app/services/resume_chunker.py`
 - bump `INDEX_VERSION`
-- new migration builds `resume_chunks_v3` with the **same** size as now (768), re-indexes and moves the alias
+- new migration builds `resume_chunks_v4` with the **same** size as now (768), re-indexes and moves the alias
 - `.env` doesn't change
 
 Why a new collection, even though the size is the same? Rebuilding in place would mix old and new chunks while
@@ -276,9 +279,9 @@ it runs, and old leftover chunks would stay behind. A new collection gives a cle
 
 When the new collection has worked well for a few days:
 
-`vector_migrations/0007_drop_resume_chunks_v1.py`
+`vector_migrations/0008_drop_resume_chunks_v1.py`
 ```python
-"""v2 is in use; v1 (MiniLM) is no longer needed."""
+"""v3 is in use; v1 (MiniLM) is no longer needed."""
 
 
 async def upgrade(client, db) -> None:
@@ -328,7 +331,7 @@ Find them:
 ```sql
 select id, indexed_version, index_attempts, index_error
 from documents
-where indexed_version is null or indexed_version < 2;   -- 2 = current INDEX_VERSION
+where indexed_version is null or indexed_version < 3;   -- 3 = current INDEX_VERSION
 ```
 
 ---
