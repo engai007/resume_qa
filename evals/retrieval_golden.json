@@ -1,8 +1,8 @@
 {
   "name": "resume retrieval golden set",
-  "version": 3,
+  "version": 4,
   "created": "2026-11-17",
-  "updated": "2026-11-18 - INDEX_VERSION 4 (hybrid): added keyword questions q25-q27",
+  "updated": "2026-11-18 - more no-answer questions q28-q33 (key words checked: in no chunk)",
   "search_as_user": "yogesh@gmail.com",
   "matching": "A retrieved chunk is correct when its document_hash equals the expected document's hash AND its text contains the `contains` snippet (exact, case-sensitive). Every relevant chunk is listed, so recall can be measured.",
   "documents": {
@@ -262,6 +262,42 @@
         {"document": "resume_a", "contains": "legacy ZMQ messaging"},
         {"document": "resume_b", "contains": "legacy ZMQ messaging"}
       ]
+    },
+    {
+      "id": "q28",
+      "type": "no_answer",
+      "question": "Who has a medical license?",
+      "expected": []
+    },
+    {
+      "id": "q29",
+      "type": "no_answer",
+      "question": "Experience with SAP ABAP?",
+      "expected": []
+    },
+    {
+      "id": "q30",
+      "type": "no_answer",
+      "question": "Which candidate has a PhD?",
+      "expected": []
+    },
+    {
+      "id": "q31",
+      "type": "no_answer",
+      "question": "Who has built Android apps in Kotlin?",
+      "expected": []
+    },
+    {
+      "id": "q32",
+      "type": "no_answer",
+      "question": "Who has made games with Unity?",
+      "expected": []
+    },
+    {
+      "id": "q33",
+      "type": "no_answer",
+      "question": "Who speaks Japanese?",
+      "expected": []
     }
   ]
 }

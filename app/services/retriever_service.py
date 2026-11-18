@@ -3,7 +3,7 @@
 mode:
 - "dense"  : by meaning (bge vector). score = cosine similarity, 0..1
 - "sparse" : by keywords (BM25). score = BM25 score, no upper limit
-- "hybrid" : both, merged by Qdrant with RRF (Reciprocal Rank Fusion). score = RRF score:
+- "hybrid" : both, merged by Qdrant with weighted RRF (Reciprocal Rank Fusion). score = RRF score:
              it only says how well a chunk ranked in both lists, so don't compare it with a threshold
 """
 from typing import Literal

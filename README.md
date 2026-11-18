@@ -69,4 +69,4 @@ uv run python scripts/show_chunks.py [document_id]     # save chunks + metadata 
 
 ## Docs
 - Vector DB (Qdrant) migrations: [docs/vector_migrations.md](docs/vector_migrations.md)
-- Hybrid search plan (dense + BM25 + RRF): [docs/hybrid_search_plan.md](docs/hybrid_search_plan.md)
+- Hybrid search (dense + BM25 + weighted RRF): [docs/hybrid_search_plan.md](docs/hybrid_search_plan.md)

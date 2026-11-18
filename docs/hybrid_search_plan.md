@@ -54,8 +54,8 @@ chunk text ──┬── HF bge-base-en-v1.5 ──► dense vector  [0.12, -0
 
                          SEARCH (one request to Qdrant)
 question ──┬── dense query vector ──► Qdrant: top 20 by meaning   ──┐
-           │                                (filtered by user)       ├── Qdrant merges with RRF ──► top 5
-           └── sparse query vector ─► Qdrant: top 20 by keywords  ──┘
+           │                                (filtered by user)       ├── Qdrant merges with weighted RRF ──► top 5
+           └── sparse query vector ─► Qdrant: top 20 by keywords  ──┘        (dense counts 2x, BM25 1x)
 ```
 
 **Qdrant does all the searching and the merging.** Our code only makes the two query vectors and sends one request.
@@ -235,7 +235,8 @@ await client.create_collection(
 ## 7. Search changes: `app/services/retriever_service.py`
 
 ```python
-CANDIDATES = 20   # each search sends its top 20 to the merge; then RRF picks the final top_k
+CANDIDATES = 20            # each search sends its top 20 to the merge; then RRF picks the final top_k
+RRF_WEIGHTS = [2.0, 1.0]   # [dense, bm25]: dense counts twice as much (see section 8)
 
 
 async def search_chunks(user_id, query, top_k=5, document_hashes=None, mode="hybrid"):
@@ -258,7 +259,7 @@ async def search_chunks(user_id, query, top_k=5, document_hashes=None, mode="hyb
                 models.Prefetch(query=await embed_query(query), using="dense", filter=flt, limit=CANDIDATES),
                 models.Prefetch(query=await sparse_embed_query(query), using="bm25", filter=flt, limit=CANDIDATES),
             ],
-            query=models.FusionQuery(fusion=models.Fusion.RRF),   # Qdrant merges the two lists
+            query=models.RrfQuery(rrf=models.Rrf(weights=RRF_WEIGHTS)),   # Qdrant merges the two lists
             limit=top_k,
             with_payload=True,
         )
@@ -266,9 +267,11 @@ async def search_chunks(user_id, query, top_k=5, document_hashes=None, mode="hyb
 ```
 
 - **`prefetch`** = "run these searches first". Each one returns its own top 20.
-- **`FusionQuery(RRF)`** = "merge those lists by rank".
+- **`RrfQuery(Rrf(weights=[2, 1]))`** = "merge those lists by rank, and count dense twice as much as BM25".
+  (Plain `FusionQuery(fusion=Fusion.RRF)` counts both equally. We tried it first; it was worse, see section 8.)
 - **The filter goes in each prefetch**, so both searches only see this user's resumes.
 - **`mode`** exists so the eval can compare dense vs sparse vs hybrid on the same golden set.
+  `hybrid` (weighted) is the default.
   The API can expose it too, with a default of `"hybrid"`.
 
 `app/schemas/retriever.py`: add `mode: Literal["hybrid", "dense", "sparse"] = "hybrid"` to `SearchRequest`.
@@ -310,13 +313,47 @@ RRF score = 1 / (k + rank in dense)  +  1 / (k + rank in BM25)
 Just to show the idea, it's this simple:
 
 ```python
-def rrf(dense_ids, sparse_ids, k=60):
+def rrf(dense_ids, sparse_ids, weights=(2.0, 1.0), k=60):
     scores = {}
-    for ranked in (dense_ids, sparse_ids):
+    for ranked, weight in zip((dense_ids, sparse_ids), weights):
         for rank, cid in enumerate(ranked, start=1):
-            scores[cid] = scores.get(cid, 0) + 1 / (k + rank)
+            scores[cid] = scores.get(cid, 0) + weight / (k + rank)
     return sorted(scores, key=scores.get, reverse=True)
 ```
+
+### Weighted RRF (what we use)
+
+Plain RRF counts both lists **equally**. Weighted RRF multiplies each list's points by a weight:
+
+```
+score = 2 × 1/(k + rank in dense)  +  1 × 1/(k + rank in BM25)        RRF_WEIGHTS = [2.0, 1.0]
+```
+
+**Why:** with equal weights, BM25 matching one common word could push a wrong chunk above the right one.
+
+**Example: q18 "Which candidates have an electrical engineering degree?"** (k = 60, made-up ranks).
+The right chunk says "EEE", not "electrical engineering", so BM25 can't find it.
+
+| Chunk | Dense rank | BM25 rank | Plain RRF | Weighted RRF (2 : 1) |
+|---|---|---|---|---|
+| ✅ Education (EEE) | 1 | — | 1/61 = 0.0164 | 2/61 = **0.0328** ← #1 |
+| ❌ Project with the word "engineering" | 6 | 1 | 1/66 + 1/61 = **0.0316** ← #1 | 2/66 + 1/61 = 0.0303 |
+
+- **Plain:** BM25 alone lifts the wrong chunk to the top.
+- **Weighted:** dense is sure about Education, and BM25 can't overrule it.
+
+BM25 still rescues exact words. In q04, the "Message Queues" skill chunk is about #8 in dense and #1 in BM25,
+which is still enough to get into the top 5.
+
+**In short: dense decides, BM25 breaks ties and rescues exact keywords.**
+
+| mode | recall@5 | precision@5 | MRR |
+|---|---|---|---|
+| dense | 0.94 | 0.50 | 0.97 |
+| hybrid, plain RRF | 0.93 | 0.50 | 0.93 |
+| **hybrid, weighted RRF 2 : 1** | **0.95** | **0.51** | 0.95 |
+
+The weights live in `RRF_WEIGHTS` in `app/services/retriever_service.py`. If you change them, run the eval again.
 
 ---
 
@@ -327,7 +364,7 @@ With hybrid, `score` in the results is the **RRF score** (e.g. `0.0328`), not co
 - It only says "how well ranked across both searches". **0.03 doesn't mean bad.**
 - It **can't be used for the no-answer check.** RRF always gives the best chunk a high fused score, even for "who knows COBOL?".
 - So the no-answer metric in the eval keeps using the **dense** score (a separate `mode="dense"` call for those questions).
-  A real "is anything relevant?" score comes later, with a reranker.
+  A reranker (bge-reranker-base) was tried for this on 2026-11-18: its scores did not separate answers from no-answers, so it was removed.
 
 ---
 
