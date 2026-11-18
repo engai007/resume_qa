@@ -11,6 +11,6 @@ router = APIRouter()
 @router.post("/search", response_model=SearchResponse)
 async def search(body: SearchRequest, user: User = Depends(get_current_user)):
     """Find the resume chunks closest to the query. Only searches resumes you uploaded;
-    pass document_hashes to search only those resumes."""
-    results = await search_chunks(user.id, body.query, body.top_k, body.document_hashes)
+    pass document_hashes to search only those resumes. mode: hybrid (default), dense or sparse."""
+    results = await search_chunks(user.id, body.query, body.top_k, body.document_hashes, body.mode)
     return {"query": body.query, "results": results}

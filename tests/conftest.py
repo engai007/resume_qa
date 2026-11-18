@@ -1,8 +1,10 @@
 import asyncio
+import re
+import zlib
 
 import pytest
 from fastapi.testclient import TestClient
-from qdrant_client import AsyncQdrantClient
+from qdrant_client import AsyncQdrantClient, models
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -31,6 +33,30 @@ async def fake_embed_query(query):
     return vector
 
 
+def fake_sparse(text: str) -> models.SparseVector:
+    """Tiny BM25 stand-in: every lowercase word -> a fixed number, weight 1."""
+    ids = sorted({zlib.crc32(w.encode()) % 100_000 for w in re.findall(r"\w+", text.lower())})
+    return models.SparseVector(indices=ids, values=[1.0] * len(ids))
+
+
+async def fake_sparse_embed(texts):
+    return [fake_sparse(t) for t in texts]
+
+
+async def fake_sparse_query(query):
+    return fake_sparse(query)
+
+
+def use_fake_vectors(monkeypatch, client: AsyncQdrantClient) -> None:
+    """Indexing and search use `client` and fake embeddings (no real Qdrant, no HF calls, no BM25 model)."""
+    monkeypatch.setattr(indexing_service, "qdrant", client)
+    monkeypatch.setattr(indexing_service, "embed_texts", fake_embed)
+    monkeypatch.setattr(indexing_service, "sparse_embed_texts", fake_sparse_embed)
+    monkeypatch.setattr(retriever_service, "qdrant", client)
+    monkeypatch.setattr(retriever_service, "embed_query", fake_embed_query)
+    monkeypatch.setattr(retriever_service, "sparse_embed_query", fake_sparse_query)
+
+
 async def run_vector_migrations(client: AsyncQdrantClient, db_path) -> None:
     """Apply every vector migration to `client` (using an empty throwaway DB)."""
     engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}", poolclass=NullPool)
@@ -43,10 +69,7 @@ async def run_vector_migrations(client: AsyncQdrantClient, db_path) -> None:
 def vector_db(tmp_path, monkeypatch):
     """Indexing and search use an in-memory Qdrant with fake embeddings (no real Qdrant, no HF calls)."""
     client = AsyncQdrantClient(":memory:")
-    monkeypatch.setattr(indexing_service, "qdrant", client)
-    monkeypatch.setattr(indexing_service, "embed_texts", fake_embed)
-    monkeypatch.setattr(retriever_service, "qdrant", client)
-    monkeypatch.setattr(retriever_service, "embed_query", fake_embed_query)
+    use_fake_vectors(monkeypatch, client)
     asyncio.run(run_vector_migrations(client, tmp_path / "migrations.db"))
     return client
 

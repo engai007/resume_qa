@@ -1,8 +1,8 @@
 {
   "name": "resume retrieval golden set",
-  "version": 2,
+  "version": 3,
   "created": "2026-11-17",
-  "updated": "2026-11-18 - INDEX_VERSION 3: company questions point to each project chunk",
+  "updated": "2026-11-18 - INDEX_VERSION 4 (hybrid): added keyword questions q25-q27",
   "search_as_user": "yogesh@gmail.com",
   "matching": "A retrieved chunk is correct when its document_hash equals the expected document's hash AND its text contains the `contains` snippet (exact, case-sensitive). Every relevant chunk is listed, so recall can be measured.",
   "documents": {
@@ -233,6 +233,35 @@
       "type": "no_answer",
       "question": "Experience building iOS apps in Swift?",
       "expected": []
+    },
+    {
+      "id": "q25",
+      "type": "keyword",
+      "question": "SpiceDB experience",
+      "expected": [
+        {"document": "resume_a", "contains": "SpiceDB authorization schemas"}
+      ]
+    },
+    {
+      "id": "q26",
+      "type": "keyword",
+      "question": "Who used LightFM?",
+      "expected": [
+        {"document": "resume_a", "contains": "embeddings / LightFM"},
+        {"document": "resume_b", "contains": "embeddings / LightFM"},
+        {"document": "resume_b", "contains": "AI/ML: LightFM"}
+      ]
+    },
+    {
+      "id": "q27",
+      "type": "keyword",
+      "question": "ZMQ to RabbitMQ migration",
+      "expected": [
+        {"document": "resume_a", "contains": "PHP + ZMQ"},
+        {"document": "resume_b", "contains": "PHP + ZMQ"},
+        {"document": "resume_a", "contains": "legacy ZMQ messaging"},
+        {"document": "resume_b", "contains": "legacy ZMQ messaging"}
+      ]
     }
   ]
 }
