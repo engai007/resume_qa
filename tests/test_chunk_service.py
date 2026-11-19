@@ -17,4 +17,6 @@ def test_build_chunks_adds_metadata():
     assert chunks[1].metadata.model_dump() == {
         "document_id": 3, "document_hash": "abc123", "uploaded_by": 7,
         "user_email": "rec@x.com", "uploaded_at": uploaded, "candidate_name": "Jane Doe", "chunk_index": 1,
+        "section": "skills",
     }
+    assert chunks[0].metadata.section == "profile"

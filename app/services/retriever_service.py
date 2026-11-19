@@ -54,6 +54,7 @@ async def search_chunks(user_id: int, query: str, top_k: int = 5,
             "document_hash": point.payload["document_hash"],
             "candidate_name": point.payload.get("candidate_name"),
             "chunk_index": point.payload["chunk_index"],
+            "section": point.payload.get("section"),  # None in collections before v5
         }
         for point in response.points
     ]

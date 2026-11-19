@@ -15,8 +15,9 @@ logger = logging.getLogger(__name__)
 # Bump when chunking or the embedding model changes (together with a new vector migration).
 # 1 = all-MiniLM-L6-v2 (local), 2 = BAAI/bge-base-en-v1.5 (HF Inference),
 # 3 = one chunk per project + skills per category in groups of 8,
-# 4 = hybrid: named vectors "dense" (bge) + "bm25" (sparse)
-INDEX_VERSION = 4
+# 4 = hybrid: named vectors "dense" (bge) + "bm25" (sparse),
+# 5 = "Experience summary" chunk (total work experience) + "Personal project:" label
+INDEX_VERSION = 5
 
 DENSE = "dense"
 SPARSE = "bm25"
