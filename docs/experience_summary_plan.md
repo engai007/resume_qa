@@ -35,13 +35,17 @@ PDF -> parser (LLM) -> resume JSON -> make_chunks() -> embed -> Qdrant
 
 ```
 Experience summary
-Total work experience: 6 years 4 months (company jobs only, personal projects not counted; as of Nov 2026)
+Total experience: 6 years 4 months
 Working since: Mar 2020, at 5 companies
 ```
 
 Only the total, **no per-company lines**. A first version listed every company with its dates; then the chunk
 matched every "work at <company>" question and pushed real chunks down (eval: q12 "Work done at Infinite" and
 q20 "recognition at work" got worse). Each company's dates are already in its own `Experience:` chunk.
+For the same reason there is no "(company jobs only, personal projects not counted; as of ...)" note:
+the words "company" and "project" pulled the chunk up for company and project questions.
+And it says `Total experience`, not `Total work experience`: "work" pulled it up for questions
+like "recognition at work" (q20). q34 "total work experience?" still finds it at #1.
 
 The LLM only reads the number; it never adds dates itself.
 
@@ -81,9 +85,9 @@ Date formats read: `Mar 2020`, `March 2020`, `Sept 2020`, `03/2020`, `2020-03`, 
 
 ## Limits
 
-- **"present" is frozen at indexing time.** A resume indexed in Nov 2026 still says "as of Nov 2026" a year later.
-  That's why the chunk says "as of". Re-indexing (next INDEX_VERSION or a reindex job, see `todo/reindex-job.md`)
-  refreshes it.
+- **"present" is frozen at indexing time.** A resume indexed in Nov 2026 still shows the Nov 2026 total a year
+  later. The chunk no longer says "as of <month>" (that note hurt ranking), so the text doesn't show this.
+  Re-indexing (next INDEX_VERSION or a reindex job, see `todo/reindex-job.md`) refreshes it.
 - It trusts the parser's dates. If the parser put a personal project under experience, it's counted
   (that's what `move_personal_projects` in the parser is for).
 - Only total experience. "Years with Python" is not calculated (skills have no dates).

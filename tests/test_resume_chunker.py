@@ -25,13 +25,13 @@ def test_make_chunks():
     assert acme == f"{header}\n- Built pipelines"  # company bullets outside any project
     assert search == f"{header}\nProject: Search\n- Added ranking"
     assert chat == f"{header}\nProject: Chat\n- Used WebSockets"
-    assert summary.startswith("Experience summary\nTotal work experience: 6 years 10 months")  # Jan 2020 - Nov 2026
+    assert summary.startswith("Experience summary\nTotal experience: 6 years 10 months")  # Jan 2020 - Nov 2026
 
 
 def test_company_without_projects_is_one_chunk():
     [_, (_, acme), (_, summary)] = make_chunks({"name": "J", "experience": [{"company": "Acme", "details": ["Did X"]}]})
     assert acme == "Experience: Acme\nStart: None\nEnd: None\n- Did X"
-    assert summary == "Experience summary\nTotal work experience: unknown (job dates unclear)"
+    assert summary == "Experience summary\nTotal experience: unknown (job dates unclear)"
 
 
 def test_long_skill_list_is_split_into_groups():
@@ -56,7 +56,7 @@ def test_experience_summary_adds_up_jobs():
     # 9 + 20 + 8 + 6 + 33 = 76 months; the Feb-Jun 2024 gap and the personal project don't count
     assert experience_summary(resume, TODAY) == (
         "Experience summary\n"
-        "Total work experience: 6 years 4 months (company jobs only, personal projects not counted; as of Nov 2026)\n"
+        "Total experience: 6 years 4 months\n"
         "Working since: Mar 2020, at 5 companies")  # no company names: they made it match every company question
 
 
@@ -71,7 +71,7 @@ def test_date_formats():
             {"company": "B", "start": "Sept. 2019", "end": "2019"},   # Sep - Dec = 3
             {"company": "C", "start": "N/A", "end": "2020"}]          # unreadable, not counted
     summary = experience_summary({"experience": jobs}, TODAY)
-    assert "Total work experience: 9 months" in summary
+    assert "Total experience: 9 months" in summary
     assert summary.endswith("Working since: Mar 2018, at 3 companies; 1 with unclear dates not counted")
 
 

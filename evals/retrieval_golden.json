@@ -304,8 +304,8 @@
       "type": "experience",
       "question": "What is the total work experience of the candidate?",
       "expected": [
-        {"document": "resume_a", "contains": "Total work experience:"},
-        {"document": "resume_b", "contains": "Total work experience:"}
+        {"document": "resume_a", "contains": "Total experience:"},
+        {"document": "resume_b", "contains": "Total experience:"}
       ]
     }
   ]
