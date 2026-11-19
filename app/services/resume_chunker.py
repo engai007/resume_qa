@@ -76,12 +76,13 @@ def experience_summary(r: dict, today: date) -> str | None:
     spans = [s for s in (job_span(e, today) for e in jobs) if s]
     unclear = len(jobs) - len(spans)
     if not spans:
-        return "Experience summary\nTotal work experience: unknown (job dates unclear)"
+        return "Experience summary\nTotal experience: unknown (job dates unclear)"
     companies = f"{len(jobs)} compan{'y' if len(jobs) == 1 else 'ies'}"
     note = f"; {unclear} with unclear dates not counted" if unclear else ""
+    # no "(company jobs only, personal projects not counted)" note: the words "company" and "project"
+    # made this chunk rank above real company / project chunks
     return ("Experience summary\n"
-            f"Total work experience: {as_years(total_months(spans))} (company jobs only, personal projects "
-            f"not counted; as of {month_name(today.year * 12 + today.month - 1)})\n"
+            f"Total experience: {as_years(total_months(spans))}\n"
             f"Working since: {month_name(min(s for s, _ in spans))}, at {companies}{note}")
 
 
