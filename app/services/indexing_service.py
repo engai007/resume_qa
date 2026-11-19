@@ -48,9 +48,7 @@ async def index_document(db, doc: Document, user: User, collection: str | None =
             )
             for c, vector in zip(chunks, vectors)
         ]
-        # remove old points first, in case the document now has fewer chunks
-        await qdrant.delete(collection, points_selector=models.FilterSelector(filter=models.Filter(
-            must=[models.FieldCondition(key="document_id", match=models.MatchValue(value=doc.id))])))
+        await delete_points(collection, doc.id)  # remove old points first, in case the document now has fewer chunks
         await qdrant.upsert(collection, points=points)
     except Exception as e:
         logger.warning("indexing document %s failed: %s", doc.id, e)
@@ -63,6 +61,21 @@ async def index_document(db, doc: Document, user: User, collection: str | None =
     doc.index_error = None
     await db.commit()
     return True
+
+
+async def delete_points(collection: str, document_id: int) -> None:
+    """Delete every chunk of one document from one collection."""
+    await qdrant.delete(collection, points_selector=models.FilterSelector(filter=models.Filter(
+        must=[models.FieldCondition(key="document_id", match=models.MatchValue(value=document_id))])))
+
+
+async def delete_document_vectors(document_id: int) -> None:
+    """Delete a document's chunks from the live collection AND the old ones kept for rollback
+    (resume_chunks_v1, _v2, ...): they hold the same personal data. Raises if Qdrant is down."""
+    prefix = f"{settings.qdrant_collection}_"
+    for c in (await qdrant.get_collections()).collections:
+        if c.name.startswith(prefix):
+            await delete_points(c.name, document_id)
 
 
 async def is_hybrid(collection: str) -> bool:

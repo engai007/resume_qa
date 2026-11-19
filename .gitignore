@@ -227,5 +227,7 @@ resumes/*
 
 # LLM call logs
 logs/
-scripts/
 resumes/
+
+# Not-implemented-yet notes (local only)
+todo/

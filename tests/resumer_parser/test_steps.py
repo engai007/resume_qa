@@ -37,6 +37,24 @@ def test_move_personal_projects():
     assert r["projects"][1]["details"] == ["no company", "Sub", "x"]
 
 
+def test_move_personal_project_when_llm_skipped_the_personal_line():
+    """Real case: the LLM's ranges left out '- Personal project', so details are empty."""
+    texts = ["Work Experience", "• AI Job Search Agent: Feb 2026 - Aug 2026", "- Personal project", "◦",
+             "Multi-Agent LangGraph System:", "◦ Built a multi-agent job-search system",
+             "• Tradeindia: Mar 2020 - Dec 2022", "◦ Built a lead management platform"]
+    r = {"experience": [
+        {"company": "AI Job Search Agent", "start": "Feb 2026", "end": "Aug 2026", "details": [],
+         "projects": [{"name": "Multi-Agent LangGraph System", "details": ["Built a multi-agent job-search system"]}]},
+        {"company": "Tradeindia", "details": ["Built a lead management platform"]},
+    ], "projects": []}
+    assert move_personal_projects(r)["experience"][0]["company"] == "AI Job Search Agent"  # without texts: missed
+
+    r = move_personal_projects(r, texts)
+    assert [e["company"] for e in r["experience"]] == ["Tradeindia"]
+    assert r["projects"] == [{"name": "AI Job Search Agent", "start": "Feb 2026", "end": "Aug 2026",
+                              "details": ["Multi-Agent LangGraph System", "Built a multi-agent job-search system"]}]
+
+
 def test_contact():
     texts = ["Jane Doe", "jane@x.com | +91 98765 43210 | linkedin.com/in/jane | github.com/jane"]
     assert extract_contact(texts) == {
