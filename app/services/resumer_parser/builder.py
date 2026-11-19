@@ -65,19 +65,37 @@ PERSONAL_WORDS = ("personal project", "side project", "academic project",
                   "college project", "hobby project", "self project")
 
 
-def is_personal(e: dict) -> bool:
-    """No company, or the entry says it's a personal/side project."""
+def says_personal_under_header(company: str, texts: list[str]) -> bool:
+    """The PDF line with the company name, or one of the 2 lines below it, says "personal project".
+    Needed because the LLM sometimes leaves that line out of the entry's details:
+        36 '• AI Job Search Agent: Feb 2026 - Aug 2026'
+        37 '- Personal project'          <- not in any LLM range
+    """
+    name = company.lower()
+    for i, line in enumerate(texts):
+        if name in line.lower():
+            window = " ".join(texts[i:i + 3]).lower()
+            if any(w in window for w in PERSONAL_WORDS):
+                return True
+    return False
+
+
+def is_personal(e: dict, texts: list[str] | None = None) -> bool:
+    """No company, or the entry (or the PDF lines right under its header) says it's a personal/side project."""
     if not e.get("company"):
         return True
     text = " ".join([e.get("company") or "", e.get("role") or ""] + (e.get("details") or [])).lower()
-    return any(w in text for w in PERSONAL_WORDS)
+    if any(w in text for w in PERSONAL_WORDS):
+        return True
+    return bool(texts) and says_personal_under_header(e["company"], texts)
 
 
-def move_personal_projects(r: dict) -> dict:
-    """Move personal/side projects the LLM put under experience into projects."""
+def move_personal_projects(r: dict, texts: list[str] | None = None) -> dict:
+    """Move personal/side projects the LLM put under experience into projects.
+    `texts` = the PDF lines, to also catch a "Personal project" line the LLM didn't include."""
     keep = []
     for e in r.get("experience") or []:
-        if not is_personal(e):
+        if not is_personal(e, texts):
             keep.append(e)
             continue
         # the entry becomes one project; its sub-projects are folded into its details

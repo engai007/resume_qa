@@ -20,7 +20,7 @@ async def parse_resume(pdf_bytes: bytes, agent: ResumeParserAgent) -> tuple[list
     parsed = await agent.run(llm_input)
     parsed = fix_ranges(parsed, texts)
     resume = build_resume(parsed, contact, texts)
-    return texts, move_personal_projects(resume)
+    return texts, move_personal_projects(resume, texts)
 
 
 async def parse_resumes(files: dict[str, bytes], agent: ResumeParserAgent) -> dict:

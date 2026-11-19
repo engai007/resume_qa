@@ -2,15 +2,59 @@ import hashlib
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.agents.resume_parser import ResumeParserAgent
 from app.models import Document, DocumentMetaData, User
-from app.services.indexing_service import index_document
+from app.services.indexing_service import INDEX_VERSION, delete_document_vectors, index_document
 from app.services.resumer_parser import parse_resumes
 
 
 def file_hash(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
+
+
+async def list_documents(db: AsyncSession, user: User, limit: int = 50, offset: int = 0) -> list[dict]:
+    """The user's resumes, newest first."""
+    docs = await db.scalars(
+        select(Document).where(Document.generated_by == user.id, Document.is_active)
+        .options(selectinload(Document.meta_data))
+        .order_by(Document.created_at.desc(), Document.id.desc()).limit(limit).offset(offset))
+    return [
+        {
+            "document_id": d.id,
+            "document_hash": d.document_hash,
+            "candidate_name": (d.meta_data.parsed_doc_json or {}).get("name") if d.meta_data else None,
+            "uploaded_at": d.created_at,
+            "indexed": d.indexed_version == INDEX_VERSION,
+            "indexed_version": d.indexed_version,
+            "index_error": d.index_error,
+        }
+        for d in docs
+    ]
+
+
+class VectorDBUnavailable(Exception):
+    """Qdrant couldn't delete the chunks, so nothing was deleted."""
+
+
+async def delete_document(db: AsyncSession, user: User, document_id: int) -> bool:
+    """Delete one of the user's resumes: chunks in Qdrant, then metadata + document in Postgres.
+    False if the user has no such document. Qdrant goes first: if it's down this raises and nothing is
+    deleted, so we never end up with a removed resume whose personal data is still searchable."""
+    doc = await db.scalar(select(Document).where(Document.id == document_id, Document.generated_by == user.id)
+                          .options(selectinload(Document.meta_data)))
+    if not doc:
+        return False
+    try:
+        await delete_document_vectors(doc.id)
+    except Exception as e:
+        raise VectorDBUnavailable(str(e)) from e
+    if doc.meta_data:
+        await db.delete(doc.meta_data)
+    await db.delete(doc)
+    await db.commit()
+    return True
 
 
 async def upload_documents(db: AsyncSession, user: User, files: list[tuple[str, bytes]],
