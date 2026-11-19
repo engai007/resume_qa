@@ -12,6 +12,7 @@ class ChunkMetadata(BaseModel):
     uploaded_at: datetime
     candidate_name: str | None  # only the profile chunk has the name in its text
     chunk_index: int          # position of the chunk inside the resume
+    section: str              # profile, skills, project, experience_summary, ... (see resume_chunker.SECTIONS)
 
 
 class Chunk(BaseModel):

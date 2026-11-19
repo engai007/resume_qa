@@ -17,6 +17,7 @@ class SearchResult(BaseModel):
     document_hash: str
     candidate_name: str | None
     chunk_index: int
+    section: str | None  # profile, skills, project, ... (None before INDEX_VERSION 5)
 
 
 class SearchResponse(BaseModel):

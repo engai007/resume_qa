@@ -1,8 +1,8 @@
 {
   "name": "resume retrieval golden set",
-  "version": 4,
+  "version": 5,
   "created": "2026-11-17",
-  "updated": "2026-11-18 - more no-answer questions q28-q33 (key words checked: in no chunk)",
+  "updated": "2026-11-19 - q34 total experience (needs INDEX_VERSION 5: Experience summary chunk)",
   "search_as_user": "yogesh@gmail.com",
   "matching": "A retrieved chunk is correct when its document_hash equals the expected document's hash AND its text contains the `contains` snippet (exact, case-sensitive). Every relevant chunk is listed, so recall can be measured.",
   "documents": {
@@ -298,6 +298,15 @@
       "type": "no_answer",
       "question": "Who speaks Japanese?",
       "expected": []
+    },
+    {
+      "id": "q34",
+      "type": "experience",
+      "question": "What is the total work experience of the candidate?",
+      "expected": [
+        {"document": "resume_a", "contains": "Total work experience:"},
+        {"document": "resume_b", "contains": "Total work experience:"}
+      ]
     }
   ]
 }

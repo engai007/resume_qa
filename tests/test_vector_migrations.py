@@ -65,11 +65,12 @@ def test_rebuilds_reindex_documents_and_move_alias_to_latest(setup):
             return doc
 
     doc = asyncio.run(go())
-    assert alias_target(client) == "resume_chunks_v4"  # 0002 -> v2, 0004 -> v3, 0005 -> v4
-    for name in ("resume_chunks_v2", "resume_chunks_v3", "resume_chunks_v4"):  # old layouts still indexed fine
+    assert alias_target(client) == "resume_chunks_v5"  # 0002 -> v2, 0004 -> v3, 0005 -> v4, 0006 -> v5
+    for name in ("resume_chunks_v2", "resume_chunks_v3", "resume_chunks_v4", "resume_chunks_v5"):  # all indexed fine
         assert asyncio.run(client.count(name)).count == 2  # profile + skills chunks
-    [point], _ = asyncio.run(client.scroll("resume_chunks_v4", limit=1, with_vectors=True))
+    [point], _ = asyncio.run(client.scroll("resume_chunks_v5", limit=1, with_vectors=True))
     assert set(point.vector) == {"dense", "bm25"}  # both vectors in one point
+    assert point.payload["section"] in ("profile", "skills")  # v5 chunks carry their section
     assert doc.indexed_version == indexing_service.INDEX_VERSION
 
 

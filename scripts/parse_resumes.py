@@ -53,7 +53,7 @@ async def main(paths: list[str]) -> None:
 
         chunks_file = out_dir / f"{Path(name).stem}__{model}__chunks.txt"
         chunks = make_chunks(resume)
-        text = "\n\n".join(f"{'=' * 60}\nCHUNK {i}\n{c}" for i, c in enumerate(chunks))
+        text = "\n\n".join(f"{'=' * 60}\nCHUNK {i} ({section})\n{c}" for i, (section, c) in enumerate(chunks))
         chunks_file.write_text(text, encoding="utf-8")
         print(f"OK    {name} -> {out_file.name}, {chunks_file.name} ({len(chunks)} chunks)")
 
