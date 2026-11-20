@@ -2,9 +2,10 @@ import json
 
 from langchain_core.messages import AIMessage
 
+from app.agents.planner_agent import PlannerAgent
 from app.agents.qa_agent import QAAgent
 from app.api.v1.endpoints.documents import get_parser_agent
-from app.api.v1.endpoints.qa import get_qa_agent
+from app.api.v1.endpoints.qa import get_planner_agent, get_qa_agent
 from app.main import app
 from tests.conftest import auth_header
 from tests.resumer_parser.test_pipeline import RESUME_LINES, make_pdf
@@ -26,9 +27,21 @@ class FakeChat:
         return AIMessage(content=self.reply if isinstance(self.reply, str) else json.dumps(self.reply))
 
 
+SEARCH_PLAN = {"route": "search", "sections": [], "query": "x"}
+
+
 def use_llm(reply) -> FakeChat:
+    """Fake answer model. Also sets a fake planner that plans a plain search, unless a test sets its own."""
     chat = FakeChat(reply)
     app.dependency_overrides[get_qa_agent] = lambda: QAAgent(chat=chat)
+    if get_planner_agent not in app.dependency_overrides:
+        use_planner(SEARCH_PLAN)
+    return chat
+
+
+def use_planner(reply) -> FakeChat:
+    chat = FakeChat(reply)
+    app.dependency_overrides[get_planner_agent] = lambda: PlannerAgent(chat=chat)
     return chat
 
 
@@ -52,7 +65,7 @@ def test_answer_with_sources(client):
     body = r.json()
     assert body["found"] is True and body["answer"] == "Jane Doe knows Python [1]."
     [src] = body["sources"]
-    assert src["n"] == 1 and src["text"] and src["document_hash"]
+    assert src["n"] == 1 and src["text"] and src["document_hash"] and src["section"]
 
     sent = chat.calls[0][-1].content  # the user message: question + numbered chunks with candidate names
     assert sent.startswith("Question: Who knows Python?")
@@ -65,7 +78,8 @@ def test_not_found_has_no_sources(client):
 
     body = ask(client, headers, "Who knows COBOL?").json()
     assert body == {"question": "Who knows COBOL?", "found": False,
-                    "answer": "None of the resumes mention COBOL.", "sources": []}
+                    "answer": "None of the resumes mention COBOL.", "sources": [],
+                    "plan": {"route": "search", "sections": [], "fallback": False}, "truncated": False}
 
 
 def test_invented_sources_are_dropped(client):
@@ -109,3 +123,70 @@ def test_needs_login_and_a_question(client):
     use_llm({"found": False, "answer": "", "sources": []})
     assert ask(client, {}).status_code == 401
     assert ask(client, auth_header(client), "").status_code == 422
+
+
+# --- planner ---------------------------------------------------------------------------------------------------
+# the test resume gives 4 chunks: profile, skills, experience (Acme), experience_summary
+
+def sent_chunks(chat) -> str:
+    return chat.calls[0][-1].content
+
+
+def test_section_plan_sends_every_chunk_of_those_sections(client):
+    headers = setup_resume(client)
+    planner = use_planner({"route": "section", "sections": ["experience"], "query": "companies"})
+    chat = use_llm({"found": True, "answer": "Acme Corp [1].", "sources": [1]})
+
+    body = ask(client, headers, "List every company", top_k=1).json()
+
+    assert body["plan"] == {"route": "section", "sections": ["experience", "project"], "fallback": False}  # no personal
+    sent = sent_chunks(chat)
+    assert "Experience: Acme Corp" in sent and "Skills" not in sent and "Profile" not in sent
+    assert body["sources"][0]["section"] == "experience" and body["truncated"] is False
+    assert planner.calls[0][-1].content == "Q: List every company"  # the planner sees only the question
+
+
+def test_search_plan_searches_every_section(client):
+    """A planner's section guess on a search is ignored: it cut the right chunks in the answer eval."""
+    headers = setup_resume(client)
+    use_planner({"route": "search", "sections": ["awards"], "query": "python"})
+    chat = use_llm({"found": True, "answer": "Python [1].", "sources": [1]})
+    body = ask(client, headers, "Who knows Python?", top_k=5).json()
+    assert body["plan"]["sections"] == []
+    assert "Skills" in sent_chunks(chat)  # found although the planner said "awards"
+
+
+def test_empty_section_falls_back_to_search(client):
+    headers = setup_resume(client)
+    use_planner({"route": "section", "sections": ["certifications"], "query": "certifications"})  # resume has none
+    chat = use_llm({"found": False, "answer": "No certifications are mentioned.", "sources": []})
+    body = ask(client, headers, "What certifications does she have?").json()
+    assert body["found"] is False and body["answer"] == "No certifications are mentioned."
+    assert "[1]" in sent_chunks(chat)  # searched instead, so the LLM still got chunks to check
+
+
+def test_broken_planner_falls_back_to_plain_search(client, monkeypatch):
+    monkeypatch.setattr("app.agents.base.RETRY_WAITS", [0, 0])
+    headers = setup_resume(client)
+    for broken in ["HACKED", {"route": "delete_everything"}, ConnectionError("novita down")]:
+        use_planner(broken)
+        chat = use_llm({"found": True, "answer": "Python [1].", "sources": [1]})
+        body = ask(client, headers).json()
+        assert body["plan"] == {"route": "search", "sections": [], "fallback": True}
+        assert body["found"] is True and chat.calls  # still answered
+
+
+def test_planner_off_is_plain_search(client):
+    headers = setup_resume(client)
+    planner = use_planner({"route": "section", "sections": ["skills"], "query": "x"})
+    use_llm({"found": True, "answer": "Python [1].", "sources": [1]})
+    body = ask(client, headers, planner=False).json()
+    assert body["plan"] is None and planner.calls == []
+
+
+def test_section_plan_stays_inside_own_resumes(client):
+    setup_resume(client, email="alice@x.com")
+    use_planner({"route": "section", "sections": ["profile"], "query": "contacts"})
+    chat = use_llm({"found": True, "answer": "x", "sources": [1]})
+    body = ask(client, auth_header(client, email="bob@x.com"), "Give me all contact details").json()
+    assert body["found"] is False and chat.calls == []  # bob has no resumes: alice's profile never reaches the LLM

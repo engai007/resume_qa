@@ -1,0 +1,155 @@
+{
+  "name": "answer golden set: list / total / section questions",
+  "version": 2,
+  "created": "2026-11-20",
+  "note": "Used by evals/answer_eval.py together with the questions of evals/retrieval_golden.json. Each question here is asked about one resume (`document`, from retrieval_golden's documents) or all of them (null). `items`: things the answer must name; each item is a string or a list of accepted spellings, matched case-insensitively in the answer text. Item recall = items named / items.",
+  "questions": [
+    {
+      "id": "l01",
+      "question": "give me all projects user has worked upon",
+      "document": "resume_a",
+      "items": [
+        "Alpha Zulu",
+        "QC",
+        "IHRE",
+        "IWO",
+        "ETL Data Pipeline",
+        "AELMS",
+        "Real-time Chatting",
+        "Sales Force Automation",
+        "AI Job Search Agent"
+      ]
+    },
+    {
+      "id": "l02",
+      "question": "List every project the candidate has done",
+      "document": "resume_b",
+      "items": [
+        "QC",
+        "IHRE",
+        "IWO",
+        "ETL Data Pipeline",
+        "AELMS",
+        "Real-time Chatting",
+        "Sales Force Automation"
+      ]
+    },
+    {
+      "id": "l03",
+      "question": "Show every company the candidate worked at",
+      "document": "resume_a",
+      "items": [
+        "Verticurl",
+        "Infinite",
+        "Edge",
+        "SupplyCopia",
+        "Tradeindia"
+      ]
+    },
+    {
+      "id": "l04",
+      "question": "Which companies has the candidate worked for?",
+      "document": "resume_b",
+      "items": [
+        "Infinite",
+        "Edge",
+        "SupplyCopia",
+        "Tradeindia"
+      ]
+    },
+    {
+      "id": "l05",
+      "question": "What is the total experience?",
+      "document": "resume_a",
+      "items": [
+        [
+          "6 years 4 months",
+          "6 years and 4 months"
+        ]
+      ]
+    },
+    {
+      "id": "l06",
+      "question": "How many years of experience does the candidate have?",
+      "document": "resume_b",
+      "items": [
+        [
+          "6 years 4 months",
+          "6 years and 4 months"
+        ]
+      ]
+    },
+    {
+      "id": "l07",
+      "question": "Where did the candidate study?",
+      "document": "resume_a",
+      "items": [
+        "Delhi Technological University"
+      ]
+    },
+    {
+      "id": "l08",
+      "question": "What awards has the candidate won?",
+      "document": "resume_a",
+      "items": [
+        "Best Employee Award"
+      ]
+    },
+    {
+      "id": "l09",
+      "question": "List the candidate's publications",
+      "document": "resume_a",
+      "items": [
+        "Power Quality"
+      ]
+    },
+    {
+      "id": "l10",
+      "question": "List all projects",
+      "document": null,
+      "items": [
+        "Alpha Zulu",
+        "QC",
+        "IHRE",
+        "IWO",
+        "ETL Data Pipeline",
+        "AELMS",
+        "Real-time Chatting",
+        "Sales Force Automation",
+        "AI Job Search Agent"
+      ]
+    },
+    {
+      "id": "l11",
+      "question": "list all the project user has worked upon",
+      "document": "resume_a",
+      "items": [
+        "Alpha Zulu",
+        "QC",
+        "IHRE",
+        "IWO",
+        "ETL Data Pipeline",
+        "AELMS",
+        "Real-time Chatting",
+        "Sales Force Automation",
+        "AI Job Search Agent"
+      ]
+    },
+    {
+      "id": "l12",
+      "question": "Which projects did he work on?",
+      "document": "resume_a",
+      "items": [
+        "Alpha Zulu",
+        "QC",
+        "IHRE",
+        "IWO",
+        "ETL Data Pipeline",
+        "AELMS",
+        "Real-time Chatting",
+        "Sales Force Automation",
+        "AI Job Search Agent"
+      ]
+    }
+  ]
+}

@@ -72,3 +72,4 @@ uv run python scripts/show_chunks.py [document_id]     # save chunks + metadata 
 - Hybrid search (dense + BM25 + weighted RRF): [docs/hybrid_search_plan.md](docs/hybrid_search_plan.md)
 - Q&A answer step (`POST /api/v1/qa/ask`, LLM answer + sources + "not found"): [docs/qa_answer_plan.md](docs/qa_answer_plan.md)
 - Experience summary chunk (total work experience, calculated in code): [docs/experience_summary_plan.md](docs/experience_summary_plan.md)
+- Query planner (small LLM picks search vs. whole section, filters by section and candidate) - plan: [docs/planner_plan.md](docs/planner_plan.md)

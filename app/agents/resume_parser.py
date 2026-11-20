@@ -10,6 +10,7 @@ class ResumeParserAgent(BaseAgent):
     prompt = "resume_parser/system"
     model_id = settings.parser_model_id
     provider = settings.parser_provider
+    fallback_provider = settings.parser_fallback_provider
     temperature = settings.parser_temperature
     max_tokens = settings.parser_max_new_tokens
     timeout = settings.parser_timeout
