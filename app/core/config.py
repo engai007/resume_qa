@@ -34,19 +34,28 @@ class Settings(BaseSettings):
     # Default LLM for agents that don't override it (Hugging Face inference provider)
     default_model_id: str = "Qwen/Qwen2.5-72B-Instruct"
     default_provider: str = "deepinfra"
+    default_fallback_provider: str = "featherless-ai"  # same model, other provider, used on retry 1 ("" = none)
     default_temperature: float = 0.01
     default_max_tokens: int = 1024
-    default_timeout: int = 120
+    default_timeout: int = 60          # seconds per try; QA answers take 2-8 s
 
     # Every LLM call (agent, model, tokens, seconds) is appended here
     llm_log_file: str = "logs/llm_calls.jsonl"
 
+    # Query planner: small fast model, reads only the question (see docs/planner_plan.md)
+    planner_model_id: str = "meta-llama/Llama-3.1-8B-Instruct"
+    planner_provider: str = "novita"
+    planner_fallback_provider: str = "featherless-ai"
+    planner_max_tokens: int = 150      # the plan is ~30 tokens
+    planner_timeout: int = 20          # seconds per try; normal ~1 s
+
     # Resume parser
     parser_model_id: str = "Qwen/Qwen2.5-72B-Instruct"
     parser_provider: str = "deepinfra"
+    parser_fallback_provider: str = "featherless-ai"
     parser_max_new_tokens: int = 800      # only structure + line numbers, not full text
     parser_temperature: float = 0.01      # near-deterministic (HF rejects exactly 0)
-    parser_timeout: int = 600
+    parser_timeout: int = 90              # seconds per try; parses take 14-29 s, a hung call is retried
     parser_gap_ratio: float = 0.15        # char gap (x font size) treated as a space
     parser_max_words: int = 8             # truncate long description lines sent to the LLM
     parser_concurrency: int = 4           # resumes parsed in parallel

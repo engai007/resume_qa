@@ -34,10 +34,12 @@ PDF -> parser (LLM) -> resume JSON -> make_chunks() -> embed -> Qdrant
 **1. One extra "Experience summary" chunk per resume**, calculated in Python from `resume["experience"]`:
 
 ```
-Experience summary
 Total experience: 6 years 4 months
-Working since: Mar 2020, at 5 companies
+Since: Mar 2020, at 5 companies
 ```
+
+No "Experience summary" heading and no "Working since": BM25 stems "worked" and "working" to `work`,
+so in a 3-line chunk they made it rank #1 for "give me all projects user has worked upon".
 
 Only the total, **no per-company lines**. A first version listed every company with its dates; then the chunk
 matched every "work at <company>" question and pushed real chunks down (eval: q12 "Work done at Infinite" and
@@ -98,7 +100,7 @@ Date formats read: `Mar 2020`, `March 2020`, `Sept 2020`, `03/2020`, `2020-03`, 
 - `vector_migrations/0006_experience_summary_chunk.py`: same shape as `0005` (same vectors), builds
   `resume_chunks_v5`, re-indexes all active documents, moves the alias. v4 is kept for rollback.
 - Golden set (v5): new question `q34` "What is the total work experience of the candidate?",
-  expected = the `Experience summary` chunk of each resume. Golden matching uses `contains`, not chunk numbers,
+  expected = the summary chunk (`Total experience:`) of each resume. Golden matching uses `contains`, not chunk numbers,
   so existing questions are unaffected.
 
 ## Files

@@ -57,7 +57,7 @@ async def run(golden_path: Path, k: int, threshold: float, mode: str) -> dict:
     for q in golden["questions"]:
         # search only the golden resumes, so other uploads by this user can't change the score
         q_mode = mode if q["expected"] else "dense"  # see the note at the top
-        results = await search_chunks(user.id, q["question"], top_k=k, document_hashes=hashes, mode=q_mode)
+        results = await search_chunks(user, q["question"], top_k=k, document_hashes=hashes, mode=q_mode)
         retrieved = [{"rank": i, "score": r["score"], "document_hash": r["document_hash"][:12],
                       "first_line": r["text"].splitlines()[0]} for i, r in enumerate(results, start=1)]
         if q["expected"]:

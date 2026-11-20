@@ -2,7 +2,7 @@
   "name": "resume retrieval golden set",
   "version": 5,
   "created": "2026-11-17",
-  "updated": "2026-11-19 - q34 total experience (needs INDEX_VERSION 5: Experience summary chunk)",
+  "updated": "2026-11-19 - q34 total experience (needs INDEX_VERSION 5: experience summary chunk)",
   "search_as_user": "yogesh@gmail.com",
   "matching": "A retrieved chunk is correct when its document_hash equals the expected document's hash AND its text contains the `contains` snippet (exact, case-sensitive). Every relevant chunk is listed, so recall can be measured.",
   "documents": {

@@ -21,7 +21,7 @@ class QAAgent(BaseAgent):
     """Answers a question from resume chunks; says found=false when they don't answer it."""
     name = "qa"
     prompt = "qa/system"
-    max_tokens = 512
+    max_tokens = 1024  # a list of all projects with [n] markers doesn't fit in 512
 
     async def run(self, question: str, chunks: list[dict]) -> dict:
         """-> {"found": bool, "answer": str, "sources": [chunk numbers]} as the model wrote it (not checked yet).
