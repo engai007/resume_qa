@@ -38,7 +38,8 @@ async def list_my_documents(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Your uploaded resumes, newest first. Use limit/offset to page through many."""
+    """The resumes you can read, newest first: a recruiter sees every user's, a candidate only their own.
+    Use limit/offset to page through many."""
     return await list_documents(db, user, limit, offset)
 
 

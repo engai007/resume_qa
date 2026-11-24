@@ -31,7 +31,8 @@ def build_filter(user: User, document_hashes: list[str] | None = None,
                  sections: list[str] | None = None) -> models.Filter:
     """Access first (always), then the request's own narrowing. A hash of someone else's resume is ANDed
     with the access condition, so it matches nothing: filters can narrow access, never widen it."""
-    must = [access_condition(user)]
+    access = access_condition(user)
+    must = [access] if access else []  # None = recruiter: every resume
     if document_hashes:
         must.append(models.FieldCondition(key="document_hash", match=models.MatchAny(any=document_hashes)))
     if sections:
@@ -74,6 +75,19 @@ async def search_chunks(user: User, query: str, top_k: int = 5, document_hashes:
             with_payload=True,
         )
     return [to_result(point, round(point.score, 4)) for point in response.points]
+
+
+async def best_chunks_per_resume(user: User, text: str, document_hashes: list[str] | None = None,
+                                 sections: list[str] | None = None, group_size: int = 3,
+                                 max_resumes: int = 1000) -> dict[int, list[dict]]:
+    """Each resume's `group_size` chunks closest to `text` (dense, cosine), in ONE Qdrant call for all resumes.
+    -> {document_id: [chunks, best first]}. Used by JD matching: the best score is the semantic part, the chunks
+    are the evidence for the LLM. Resumes with no chunk in `sections` are simply absent."""
+    response = await qdrant.query_points_groups(
+        settings.qdrant_collection, group_by="document_id", query=await embed_query(text), using=DENSE,
+        query_filter=build_filter(user, document_hashes, sections), limit=max_resumes, group_size=group_size,
+        with_payload=True)
+    return {group.id: [to_result(p, round(p.score, 4)) for p in group.hits] for group in response.groups}
 
 
 async def fetch_sections(user: User, sections: list[str], document_hashes: list[str] | None = None,

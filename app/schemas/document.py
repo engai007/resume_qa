@@ -20,6 +20,7 @@ class DocumentOut(BaseModel):
     indexed: bool  # chunks are in the vector DB with the current INDEX_VERSION, so it's searchable
     indexed_version: int | None
     index_error: str | None  # why indexing last failed, if it did
+    uploaded_by_me: bool  # false = another user's resume (recruiters see all); only your own can be deleted
 
 
 class DeleteResult(BaseModel):
