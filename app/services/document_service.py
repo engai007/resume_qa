@@ -6,6 +6,7 @@ from sqlalchemy.orm import selectinload
 
 from app.agents.resume_parser import ResumeParserAgent
 from app.models import Document, DocumentMetaData, User
+from app.services.access import accessible_documents
 from app.services.indexing_service import INDEX_VERSION, delete_document_vectors, index_document
 from app.services.resumer_parser import parse_resumes
 
@@ -15,9 +16,9 @@ def file_hash(content: bytes) -> str:
 
 
 async def list_documents(db: AsyncSession, user: User, limit: int = 50, offset: int = 0) -> list[dict]:
-    """The user's resumes, newest first."""
+    """The resumes the user can read (recruiter: everyone's; candidate: own), newest first."""
     docs = await db.scalars(
-        select(Document).where(Document.generated_by == user.id, Document.is_active)
+        accessible_documents(user)
         .options(selectinload(Document.meta_data))
         .order_by(Document.created_at.desc(), Document.id.desc()).limit(limit).offset(offset))
     return [
@@ -29,6 +30,7 @@ async def list_documents(db: AsyncSession, user: User, limit: int = 50, offset: 
             "indexed": d.indexed_version == INDEX_VERSION,
             "indexed_version": d.indexed_version,
             "index_error": d.index_error,
+            "uploaded_by_me": d.generated_by == user.id,  # only these can be deleted
         }
         for d in docs
     ]
@@ -39,7 +41,8 @@ class VectorDBUnavailable(Exception):
 
 
 async def delete_document(db: AsyncSession, user: User, document_id: int) -> bool:
-    """Delete one of the user's resumes: chunks in Qdrant, then metadata + document in Postgres.
+    """Delete one of the user's OWN resumes (recruiters too: reading all doesn't mean deleting all):
+    chunks in Qdrant, then metadata + document in Postgres.
     False if the user has no such document. Qdrant goes first: if it's down this raises and nothing is
     deleted, so we never end up with a removed resume whose personal data is still searchable."""
     doc = await db.scalar(select(Document).where(Document.id == document_id, Document.generated_by == user.id)

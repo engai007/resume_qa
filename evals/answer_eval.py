@@ -53,12 +53,13 @@ def build_questions(retrieval: dict, extra: dict) -> list[dict]:
     docs = retrieval["documents"]
     out = []
     for q in retrieval["questions"]:
+        # pinned to the golden resumes: the eval user is a recruiter, who can read every user's resumes
         out.append({"id": q["id"], "kind": "answerable" if q["expected"] else "no_answer", "question": q["question"],
-                    "hashes": None,
+                    "hashes": list(docs.values()),
                     "expected": [{"document_hash": docs[e["document"]], "contains": e["contains"]} for e in q["expected"]]})
     for q in extra["questions"]:
         out.append({"id": q["id"], "kind": "list", "question": q["question"],
-                    "hashes": [docs[q["document"]]] if q["document"] else None, "items": q["items"]})
+                    "hashes": [docs[q["document"]]] if q["document"] else list(docs.values()), "items": q["items"]})
     return out
 
 

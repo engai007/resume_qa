@@ -80,7 +80,13 @@ def build_filter(user, document_hashes=None, sections=None) -> models.Filter:
 `document_hashes` can never widen the scope: a hash of someone else's resume is ANDed with the access condition,
 so it matches nothing. Today `search_chunks` takes `user_id`; it will take the `user` instead.
 
-### Today: individual users
+### Since 2026-11-24: recruiters read every resume
+
+`access.py` now has the rule: a **recruiter** reads every user's resumes (search, Q&A, JD matching, the resume
+list); a **candidate** only their own. Deleting stays owner-only. Anyone can still sign up as a recruiter: the
+admin-given role and organisations below are the next steps.
+
+### Individual users (candidates)
 
 - A user uploads one or more resumes (theirs, or versions of theirs).
 - They ask about **one** (`document_hashes: ["1fa3..."]`), **some**, or **all** (empty list) of them.

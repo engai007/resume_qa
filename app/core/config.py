@@ -49,6 +49,14 @@ class Settings(BaseSettings):
     planner_max_tokens: int = 150      # the plan is ~30 tokens
     planner_timeout: int = 20          # seconds per try; normal ~1 s
 
+    # Job description parser (see docs/jd_parser_plan.md)
+    jd_parser_model_id: str = "Qwen/Qwen2.5-72B-Instruct"
+    jd_parser_provider: str = "deepinfra"
+    jd_parser_fallback_provider: str = "featherless-ai"
+    jd_parser_max_tokens: int = 1024   # the structure is ~300-600 tokens
+    jd_parser_timeout: int = 60        # seconds per try
+    jd_max_file_bytes: int = 2_000_000
+
     # Resume parser
     parser_model_id: str = "Qwen/Qwen2.5-72B-Instruct"
     parser_provider: str = "deepinfra"
