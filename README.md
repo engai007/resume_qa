@@ -74,3 +74,4 @@ uv run python scripts/show_chunks.py [document_id]     # save chunks + metadata 
 - Experience summary chunk (total work experience, calculated in code): [docs/experience_summary_plan.md](docs/experience_summary_plan.md)
 - Query planner (small LLM picks search vs. whole section, filters by section and candidate) - plan: [docs/planner_plan.md](docs/planner_plan.md)
 - Job description parser (`POST /api/v1/jds/upload`, .pdf / .txt → structured JD): [docs/jd_parser_plan.md](docs/jd_parser_plan.md)
+- JD matching (`POST /api/v1/jds/{id}/match`), every step with the full code: [docs/jd_matching_explained.md](docs/jd_matching_explained.md) (decisions + measurements: [docs/jd_matching_plan.md](docs/jd_matching_plan.md))

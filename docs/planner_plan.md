@@ -276,6 +276,26 @@ Why chunks from Qdrant and not the JSON from Postgres: the chunks already are th
 - **Answer eval** (`todo/answer-step.md`): run with `planner: true` and `planner: false`, keep the planner only if
   it's better. New list questions: "list all projects" → recall = share of the 9 projects named in the answer.
 
+## 11b. Provider change (2026-11-25)
+
+HF's model API started returning an **empty provider list for every model**, and the `huggingface_hub` client
+refuses to send a request for a provider that isn't listed, so every LLM call failed ("Model ... is not supported by
+provider ..."). The HF router itself still worked. Changes:
+
+- `app/llm/huggingface.py` calls the router's OpenAI-compatible endpoint directly (`langchain-openai`
+  `ChatOpenAI`, `base_url=https://router.huggingface.co/v1`, model `"<model>:<provider>"`). Same token, same billing.
+  `langchain-huggingface` removed.
+- Router check per provider: **Llama 8B** is no longer served by novita or featherless-ai; it is by **groq** (0.4 s)
+  and deepinfra. **Qwen 72B** is served only by **deepinfra** (featherless-ai, together, novita, nebius, ... answer
+  "not supported").
+- Planner: **groq**, fallback **deepinfra**. Planner eval on groq: valid 0.96, route 1.00, sections 1.00,
+  avg **0.65 s** (was 0.83 s on novita).
+- Qwen agents (parser, Q&A, JD parser, match): no fallback provider (none serves it).
+- Retry (`app/agents/base.py`): understands the new client's errors; "not supported by provider" now moves to the
+  fallback provider when there is a different one, instead of failing at once.
+
+The step notes below still name the providers used at the time.
+
 ## 12. Order of work
 
 0. ✅ **Small model picked**: `meta-llama/Llama-3.1-8B-Instruct` @ novita (12-question test: 11/12, ~1 s;
