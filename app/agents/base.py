@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 
 import httpx
-from huggingface_hub.errors import HfHubHTTPError, InferenceTimeoutError
+import openai
 from langchain_core.messages import SystemMessage
 
 from app.core.config import BASE_DIR, settings
@@ -21,11 +21,17 @@ TEMPORARY_STATUS = {429, 500, 502, 503, 504}  # busy / gateway errors: worth try
 def is_temporary(e: Exception) -> bool:
     """True for errors that may work on the next try: timeouts, dropped connections, 429/5xx.
     False for real errors (401 bad token, 400 bad request, ...): retrying won't help."""
-    if isinstance(e, (httpx.TransportError, InferenceTimeoutError, asyncio.TimeoutError)):  # timeouts, connection
+    if isinstance(e, (openai.APIConnectionError, httpx.TransportError, asyncio.TimeoutError)):  # incl. timeouts
         return True
-    if isinstance(e, HfHubHTTPError):
-        return e.response is not None and e.response.status_code in TEMPORARY_STATUS
+    if isinstance(e, openai.APIStatusError):
+        return e.status_code in TEMPORARY_STATUS
     return False
+
+
+def not_served_by_provider(e: Exception) -> bool:
+    """The router says this provider doesn't serve the model (seen 2026-11-25: featherless-ai dropped Qwen 72B).
+    Not temporary for THIS provider, but another provider may serve it."""
+    return isinstance(e, openai.BadRequestError) and "not supported by provider" in str(e)
 
 
 class BaseAgent:
@@ -75,7 +81,9 @@ class BaseAgent:
             except Exception as e:
                 stats.update(seconds=round(time.perf_counter() - start, 1), error=error_name(e))
                 log_llm_call(stats)
-                if attempt == len(providers) or not is_temporary(e):
+                other_provider_next = attempt < len(providers) and providers[attempt] != provider
+                if attempt == len(providers) or not (is_temporary(e) or (not_served_by_provider(e)
+                                                                         and other_provider_next)):
                     raise
                 await asyncio.sleep(RETRY_WAITS[attempt - 1])
                 continue

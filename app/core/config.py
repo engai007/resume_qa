@@ -34,7 +34,9 @@ class Settings(BaseSettings):
     # Default LLM for agents that don't override it (Hugging Face inference provider)
     default_model_id: str = "Qwen/Qwen2.5-72B-Instruct"
     default_provider: str = "deepinfra"
-    default_fallback_provider: str = "featherless-ai"  # same model, other provider, used on retry 1 ("" = none)
+    # same model on another provider, used on retry 1 ("" = none). None for Qwen 72B: since 2026-11-25 only
+    # deepinfra serves it through the HF router (featherless-ai, together, novita, ... answer "not supported")
+    default_fallback_provider: str = ""
     default_temperature: float = 0.01
     default_max_tokens: int = 1024
     default_timeout: int = 60          # seconds per try; QA answers take 2-8 s
@@ -44,15 +46,15 @@ class Settings(BaseSettings):
 
     # Query planner: small fast model, reads only the question (see docs/planner_plan.md)
     planner_model_id: str = "meta-llama/Llama-3.1-8B-Instruct"
-    planner_provider: str = "novita"
-    planner_fallback_provider: str = "featherless-ai"
+    planner_provider: str = "groq"             # novita dropped Llama 8B on 2026-11-25; groq ~0.4 s
+    planner_fallback_provider: str = "deepinfra"
     planner_max_tokens: int = 150      # the plan is ~30 tokens
     planner_timeout: int = 20          # seconds per try; normal ~1 s
 
     # Job description parser (see docs/jd_parser_plan.md)
     jd_parser_model_id: str = "Qwen/Qwen2.5-72B-Instruct"
     jd_parser_provider: str = "deepinfra"
-    jd_parser_fallback_provider: str = "featherless-ai"
+    jd_parser_fallback_provider: str = ""
     jd_parser_max_tokens: int = 1024   # the structure is ~300-600 tokens
     jd_parser_timeout: int = 60        # seconds per try
     jd_max_file_bytes: int = 2_000_000
@@ -60,7 +62,7 @@ class Settings(BaseSettings):
     # Resume parser
     parser_model_id: str = "Qwen/Qwen2.5-72B-Instruct"
     parser_provider: str = "deepinfra"
-    parser_fallback_provider: str = "featherless-ai"
+    parser_fallback_provider: str = ""
     parser_max_new_tokens: int = 800      # only structure + line numbers, not full text
     parser_temperature: float = 0.01      # near-deterministic (HF rejects exactly 0)
     parser_timeout: int = 90              # seconds per try; parses take 14-29 s, a hung call is retried
