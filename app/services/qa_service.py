@@ -70,7 +70,9 @@ async def answer_question(user: User, question: str, agent: QAAgent, top_k: int 
         chunks, truncated = await fetch_chunks(user, question, plan, top_k, document_hashes)
     except Exception as e:
         raise AnswerUnavailable(f"search failed: {e}") from e
-    result = {"question": question, "plan": plan_out, "truncated": truncated}
+    # "chunks": every chunk the answer model saw (not only the cited ones). Internal, for the RAGAS eval: AskResponse
+    # doesn't list it, so the API response leaves it out
+    result = {"question": question, "plan": plan_out, "truncated": truncated, "chunks": chunks}
     if not chunks:  # nothing uploaded (or nothing matching the given hashes): no LLM call
         return {**result, "found": False, "answer": NO_RESUMES, "sources": []}
 

@@ -54,13 +54,29 @@ def build_questions(retrieval: dict, extra: dict) -> list[dict]:
     out = []
     for q in retrieval["questions"]:
         # pinned to the golden resumes: the eval user is a recruiter, who can read every user's resumes
-        out.append({"id": q["id"], "kind": "answerable" if q["expected"] else "no_answer", "question": q["question"],
+        out.append({"id": q["id"], "kind": "answerable" if q["expected"] else "no_answer", "type": q["type"],
+                    "question": q["question"],
                     "hashes": list(docs.values()),
                     "expected": [{"document_hash": docs[e["document"]], "contains": e["contains"]} for e in q["expected"]]})
     for q in extra["questions"]:
-        out.append({"id": q["id"], "kind": "list", "question": q["question"],
+        out.append({"id": q["id"], "kind": "list", "type": "list", "question": q["question"],
                     "hashes": [docs[q["document"]]] if q["document"] else list(docs.values()), "items": q["items"]})
     return out
+
+
+def load_questions() -> tuple[list[dict], str]:
+    """-> (questions, email of the eval user). Also used by ragas_eval.py."""
+    retrieval = json.loads((ROOT / "evals" / "retrieval_golden.json").read_text())
+    extra = json.loads((ROOT / "evals" / "answer_golden.json").read_text())
+    return build_questions(retrieval, extra), retrieval["search_as_user"]
+
+
+async def eval_user(email: str) -> User:
+    async with SessionLocal() as db:
+        user = await db.scalar(select(User).where(User.email == email))
+    if not user:
+        sys.exit(f"User {email} not found.")
+    return user
 
 
 async def ask_one(q: dict, user: User, qa: QAAgent, planner: PlannerAgent | None, top_k: int, sem) -> dict:
@@ -100,13 +116,8 @@ def summary(rows: list[dict]) -> dict:
 
 
 async def main(args):
-    retrieval = json.loads((ROOT / "evals" / "retrieval_golden.json").read_text())
-    extra = json.loads((ROOT / "evals" / "answer_golden.json").read_text())
-    questions = build_questions(retrieval, extra)
-    async with SessionLocal() as db:
-        user = await db.scalar(select(User).where(User.email == retrieval["search_as_user"]))
-    if not user:
-        sys.exit(f"User {retrieval['search_as_user']} not found.")
+    questions, email = load_questions()
+    user = await eval_user(email)
 
     modes = ["plain", "planner"] if args.mode == "both" else [args.mode]
     qa, sem, reports = QAAgent(), asyncio.Semaphore(CONCURRENCY), {}
