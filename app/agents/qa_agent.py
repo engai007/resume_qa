@@ -4,12 +4,18 @@ from app.agents.base import BaseAgent
 from app.llm.json_output import extract_json
 
 
+def format_chunk(n: int, c: dict) -> str:
+    """One chunk as the model sees it: number, candidate, resume id, then the text.
+    The RAGAS eval judges answers against exactly this (the name is only in the header)."""
+    who = c.get("candidate_name") or "unknown"
+    return f"[{n}] candidate: {who} | resume: {c['document_hash'][:6]}\n{c['text']}"
+
+
 def build_context(question: str, chunks: list[dict]) -> str:
     """The user message: the question + chunks numbered from 1, each with its candidate and resume id."""
     parts = [f"Question: {question}", "", "Chunks:"]
     for n, c in enumerate(chunks, start=1):
-        who = c.get("candidate_name") or "unknown"
-        parts += [f"[{n}] candidate: {who} | resume: {c['document_hash'][:6]}", c["text"], ""]
+        parts += [format_chunk(n, c), ""]
     return "\n".join(parts).strip()
 
 

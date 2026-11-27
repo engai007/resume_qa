@@ -59,6 +59,14 @@ class Settings(BaseSettings):
     jd_parser_timeout: int = 60        # seconds per try
     jd_max_file_bytes: int = 2_000_000
 
+    # RAGAS judge, evals only (see docs/ragas_eval_plan.md). Another model family than the answer model (Qwen):
+    # a model grading its own answers is too lenient
+    judge_model_id: str = "openai/gpt-oss-120b"
+    judge_provider: str = "cerebras"           # ~1.2 s per check; groq ~2 s
+    judge_fallback_provider: str = "groq"      # used with: ragas_eval.py --provider groq
+    judge_max_tokens: int = 4096       # gpt-oss reasons first; a small limit gives an empty reply
+    judge_timeout: int = 120
+
     # Resume parser
     parser_model_id: str = "Qwen/Qwen2.5-72B-Instruct"
     parser_provider: str = "deepinfra"
